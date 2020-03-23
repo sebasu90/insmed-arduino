@@ -3,20 +3,10 @@
   TO DO:
 
   Limit inputs
-  Calculate indirect varaibles (%O2, flow)
-  Comment and translate to English
-  Non-blocking stepper (Timers)
   Read pressure sensor faster
   Send pressure BT and timestamp
 
   Button switch change up
-
-  Timer 1{
-  cont++
-  if cont>set
-    toogle pin
-    cont=0;
-  }
 
 */
 
@@ -27,40 +17,43 @@
 #include <Adafruit_ADS1015.h>
 #include <AccelStepper.h>
 
-SoftwareSerial BT (5, 6);
 LiquidCrystal_I2C lcd(0x27, 20, 4);
 
 Adafruit_ADS1115 ads(0x48);
 
-
-int encoderPinA = 2;
+// Pin definitions
+int encoderPinA = 2; // Throttle
 int encoderPinB = 3;
 int buttonPin = 4;
-int sensorPin = 11;
 
-int vel;
+int BT_Rx = 5;      // BT
+int BT_Tx = 6;
 
-long frecTimer;
+int sensorPin = 11; // Inductive sensor to control motor range
+int startButton = 12; // Start switch
 
+// Motor outputs
 int pulsePin = A0;
 int dirPin = A2;
 int enPin = A1;
 
+long frecTimer;
+
+SoftwareSerial BT (BT_Rx, BT_Tx);
 AccelStepper motor(AccelStepper::DRIVER, pulsePin, dirPin);
 
 long timerOn = 0;
 
-int startButton = 12;
-
 volatile int lastEncoded = 0;
 volatile int encoderValue[6];
-
-int16_t adc0;
-
 long lastencoderValue = 0;
+
+int16_t adc0; // ADS1015 reading
 
 int lastMSB = 0;
 int lastLSB = 0;
+
+// Manage the LDC cursor and screens
 
 int contCursor = 0;
 int contCursor2 = 0;
@@ -72,7 +65,6 @@ bool Start = false;
 bool botonAnterior;
 
 bool Read = LOW;
-bool jog;
 
 bool estadoPinA, estadoPinB;
 
@@ -84,6 +76,11 @@ long contadorCiclo = 0;
 long contadorControl = 0;
 long contadorLectura = 0;
 long contadorLecturapresion = 0;
+
+int lcdTimer = 300;
+int serialTimer = 500;
+int buttonTimer = 130;
+int changeScreenTimer = 3000;
 
 int index = 0;
 int FSM;
@@ -124,6 +121,7 @@ float exhaleTime = 0.0;
 
 float setPressure = 0.0;
 float pressure = 0.0;
+float pressureRead = 0;
 
 int readEncoderValue(int index) {
   return ((encoderValue[index - 1] / 4));
@@ -138,11 +136,6 @@ boolean isButtonPushDown(void) {
   }
   return false;
 }
-
-long cicleSteps = 500;
-long cicleMaxSpeed = 1000;
-
-long pressureRead = 0;
 
 /*******************************************************/
 
@@ -176,7 +169,7 @@ void setup()   //Las instrucciones solo se ejecutan una vez, despues del arranqu
   TCCR1B = 0;// same for TCCR1B
   TCNT1  = 0;//initialize counter value to 0
   // set compare match register for 1hz increments
-  OCR1A = 1600;// = (16*10^6) / (1*1) - 1 (must be <65536)
+  OCR1A = 3200;// = Crystal of 16Mhz / 3200 cycles = 5 kHz Timer 1 frequency
   // turn on CTC mode
   TCCR1B |= (1 << WGM12);
   // Set CS10 for no prescaler
@@ -208,7 +201,7 @@ void setup()   //Las instrucciones solo se ejecutan una vez, despues del arranqu
   BT.begin(9600);
   ads.begin();
 
-  delaymicros = 50000000 / maxFrec;
+  // Read from EEPROM the machine's parameters
 
   EEPROM.get(10, encoderValue[0]);
   EEPROM.get(20, encoderValue[1]);
@@ -225,8 +218,7 @@ void setup()   //Las instrucciones solo se ejecutan una vez, despues del arranqu
   inhaleSpeed = readEncoderValue(5);
   exhaleSpeed = readEncoderValue(6);
 
-  motor.setMaxSpeed(cicleMaxSpeed);
-  motor.setAcceleration(5000.0);
+  motor.setAcceleration(5000.0); // To test
 
 }  //Fin del Setup
 
@@ -237,13 +229,12 @@ void setup()   //Las instrucciones solo se ejecutan una vez, despues del arranqu
 void loop()
 {
 
-  if ((millis() - contadorLectura) > 1000) {
+  if ((millis() - contadorLectura) > serialTimer) {
     //    timerOn++;
-    //    pressure = readPressure();
     //    outputString = 't';
     //    outputString += timerOn;
     //    outputString += 'p';
-    //    outputString += pressure;
+    //    outputString += pressureRead;
     //    outputString += ';';
 
     //    Serial.print("FrecTimer: ");
@@ -251,12 +242,11 @@ void loop()
     //    Serial.print("    FSM: ");
     //    Serial.print(FSM);
     //    Serial.print("    Pulses: ");
-    Serial.println(frecTimer);
     frecTimer = 0;
     contadorLectura = millis();
   }
 
-  if ((millis() - contadorLCD) > 300) { // Refresh LCD
+  if ((millis() - contadorLCD) > lcdTimer) { // Refresh LCD
 
     contadorLCD = millis();
 
@@ -340,20 +330,20 @@ void loop()
     contadorBoton2 = millis();
   }
 
-  if ((millis() - contadorBoton2) > 3000) {
+  if ((millis() - contadorBoton2) > changeScreenTimer) {
     contadorBoton2 = millis();
 
     if (contCursor2 == 0) {
       contCursor2 = 1;
       contCursor = 0;
       lcd.clear();
-      lcd.setCursor(0, 0); //Apuntamos a la direccion LCD(caracter,linea)
+      lcd.setCursor(0, 0);
       lcd.print("     PARAMETERS");  //Escribimos texto
-      lcd.setCursor(0, 1); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print("PULSES:");  //Escribimos texto
-      lcd.setCursor(0, 2); //Apuntamos a la direccion LCD(caracter,linea)
+      lcd.setCursor(0, 1);
+      lcd.print("VOLUME:");  //Escribimos texto
+      lcd.setCursor(0, 2);
       lcd.print("UP SPEED:");  //Escribimos texto
-      lcd.setCursor(0, 3); //Apuntamos a la direccion LCD(caracter,linea)
+      lcd.setCursor(0, 3);
       lcd.print("DN SPEED:");  //Escribimos texto
     }
 
@@ -361,18 +351,18 @@ void loop()
       contCursor2 = 0;
       contCursor = 0;
       lcd.clear();
-      lcd.setCursor(0, 0); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print("ASSISTED VENTILATOR");  //Escribimos texto
-      lcd.setCursor(0, 1); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print("cm H2O:");  //Escribimos texto
-      lcd.setCursor(0, 2); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print("t INHA:");  //Escribimos texto
-      lcd.setCursor(0, 3); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print("t EXHA:");  //Escribimos texto
+      lcd.setCursor(0, 0);
+      lcd.print("ASSISTED VENTILATOR");
+      lcd.setCursor(0, 1);
+      lcd.print("cm H2O:");
+      lcd.setCursor(0, 2);
+      lcd.print("t INHA:");
+      lcd.setCursor(0, 3);
+      lcd.print("t EXHA:");
     }
   }
 
-  if ((millis() - contadorBoton) > 120) {
+  if ((millis() - contadorBoton) > buttonTimer) {
     contadorBoton = millis();
     if (contCursor2 == 0) {
       if (contCursor == 0) {
@@ -421,6 +411,8 @@ void loop()
     }
   }
 
+  pressureRead = readPressure(); // Once per cycle
+
   if (digitalRead(startButton))
     digitalWrite(enPin, HIGH); // disable motor
 
@@ -428,42 +420,37 @@ void loop()
 
     digitalWrite(enPin, LOW); // Enable motor
 
-    pressureRead = readPressure();
-
     switch (FSM) {
       case 0:
         contadorCiclo = millis();
-        //        contadorLecturapresion = millis();
         FSM = 1;
         digitalWrite(dirPin, HIGH); // Up
-        motor.setMaxSpeed(cicleMaxSpeed);
-        motor.moveTo(cicleSteps);
+        motor.setMaxSpeed(inhaleSpeed);
+        motor.moveTo(maxPulses);
         break;
 
       case 1: // Inhalation Cycle
         if ((millis() - contadorLecturapresion) > 50) {
           contadorLecturapresion = millis();
-          readPressure();
         }
 
         if (setPressure < pressureRead) {
           motor.stop();
         }
 
-        if (pressureRead < setPressure * 0.9) {
-          motor.moveTo(cicleSteps);
+        if (pressureRead < setPressure * 0.95) {
+          motor.moveTo(maxPulses);
         }
 
-        if (motor.currentPosition( ) > cicleSteps / 2) {
-          motor.setMaxSpeed(cicleMaxSpeed / 5);
+        if ((motor.currentPosition( ) > maxPulses / 2) || (pressureRead > setPressure * 0.5)) {
+          motor.setMaxSpeed(inhaleSpeed / 4);
         }
 
         if ((millis() - contadorCiclo) >= int(inhaleTime * 1000)) { // Condition to change state
           contadorCiclo = millis();
           FSM = 2;
-          motor.setMaxSpeed(cicleMaxSpeed);
+          motor.setMaxSpeed(exhaleSpeed);
           motor.moveTo(-10);
-          vel = exhaleSpeed;
           digitalWrite(dirPin, LOW);
         }
 
@@ -484,8 +471,7 @@ void loop()
       default:
         break;
     } // End cases
-  }
-
+  } // End machine cycle
 }  //End Loop
 
 void updateEncoder() {
@@ -510,17 +496,8 @@ float readPressure() {
   return (((adc0 - 14125.0) * 5.0478) / 1000);
 }
 
-//void stepp(int stepDelay) {
-//  PORTC |= B00000001; // Pin A0 (PC0) to HIGH
-//  delayMicroseconds(stepDelay);
-//  PORTC &= B11111110; // Pin D2 to LOW
-//  delayMicroseconds(stepDelay);
-//}
-
 ISR(TIMER1_COMPA_vect) {
-  motor.run();
-  frecTimer++;
-
+  motor.run();  // Motor keepalive (at least once per step).
 }
 
 
