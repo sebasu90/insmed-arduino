@@ -139,6 +139,11 @@ boolean isButtonPushDown(void) {
   return false;
 }
 
+long cicleSteps = 500;
+long cicleMaxSpeed = 1000;
+
+long pressureRead = 0;
+
 /*******************************************************/
 
 /*******************( SETUP )***************************/
@@ -220,7 +225,7 @@ void setup()   //Las instrucciones solo se ejecutan una vez, despues del arranqu
   inhaleSpeed = readEncoderValue(5);
   exhaleSpeed = readEncoderValue(6);
 
-  motor.setMaxSpeed(200);
+  motor.setMaxSpeed(cicleMaxSpeed);
   motor.setAcceleration(5000.0);
 
 }  //Fin del Setup
@@ -423,13 +428,16 @@ void loop()
 
     digitalWrite(enPin, LOW); // Enable motor
 
+    pressureRead = readPressure();
+
     switch (FSM) {
       case 0:
         contadorCiclo = millis();
         //        contadorLecturapresion = millis();
         FSM = 1;
         digitalWrite(dirPin, HIGH); // Up
-        motor.moveTo(1000);
+        motor.setMaxSpeed(cicleMaxSpeed);
+        motor.moveTo(cicleSteps);
         break;
 
       case 1: // Inhalation Cycle
@@ -438,14 +446,23 @@ void loop()
           readPressure();
         }
 
-        if ((setPressure < readPressure()) || (currentPulses >= maxPulses)) {
+        if (setPressure < pressureRead) {
           motor.stop();
+        }
+
+        if (pressureRead < setPressure * 0.9) {
+          motor.moveTo(cicleSteps);
+        }
+
+        if (motor.currentPosition( ) > cicleSteps / 2) {
+          motor.setMaxSpeed(cicleMaxSpeed / 5);
         }
 
         if ((millis() - contadorCiclo) >= int(inhaleTime * 1000)) { // Condition to change state
           contadorCiclo = millis();
           FSM = 2;
-          motor.moveTo(-100);
+          motor.setMaxSpeed(cicleMaxSpeed);
+          motor.moveTo(-10);
           vel = exhaleSpeed;
           digitalWrite(dirPin, LOW);
         }
