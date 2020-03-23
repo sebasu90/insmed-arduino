@@ -30,7 +30,6 @@
 SoftwareSerial BT (5, 6);
 LiquidCrystal_I2C lcd(0x27, 20, 4);
 
-
 Adafruit_ADS1115 ads(0x48);
 
 int encoderPinA = 2;
