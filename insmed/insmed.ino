@@ -32,6 +32,7 @@ LiquidCrystal_I2C lcd(0x27, 20, 4);
 
 Adafruit_ADS1115 ads(0x48);
 
+
 int encoderPinA = 2;
 int encoderPinB = 3;
 int buttonPin = 4;
@@ -219,6 +220,9 @@ void setup()   //Las instrucciones solo se ejecutan una vez, despues del arranqu
   inhaleSpeed = readEncoderValue(5);
   exhaleSpeed = readEncoderValue(6);
 
+  motor.setMaxSpeed(200);
+  motor.setAcceleration(5000.0);
+
 }  //Fin del Setup
 
 /*******************************************************/
@@ -228,13 +232,13 @@ void setup()   //Las instrucciones solo se ejecutan una vez, despues del arranqu
 void loop()
 {
 
-  if ((millis() - contadorLectura) > 10) {
+  if ((millis() - contadorLectura) > 1000) {
     //    timerOn++;
-    pressure = readPressure();
+    //    pressure = readPressure();
     //    outputString = 't';
     //    outputString += timerOn;
     //    outputString += 'p';
-    outputString += pressure;
+    //    outputString += pressure;
     //    outputString += ';';
 
     //    Serial.print("FrecTimer: ");
@@ -242,8 +246,8 @@ void loop()
     //    Serial.print("    FSM: ");
     //    Serial.print(FSM);
     //    Serial.print("    Pulses: ");
-    Serial.println(pressure);
-
+    Serial.println(frecTimer);
+    frecTimer = 0;
     contadorLectura = millis();
   }
 
@@ -415,16 +419,6 @@ void loop()
   if (digitalRead(startButton))
     digitalWrite(enPin, HIGH); // disable motor
 
-  //  Serial.print("Milis: ");
-  //  Serial.print((millis() - contadorCiclo));
-  //  Serial.print("    Max Pulses: ");
-  //  Serial.print(maxPulses);
-  //  Serial.print("    FSM ");
-  //  Serial.print(FSM);
-  //  Serial.print("    Pulses: ");
-  //  Serial.println(currentPulses);
-
-
   if (!digitalRead(startButton)) { // Start
 
     digitalWrite(enPin, LOW); // Enable motor
@@ -432,13 +426,10 @@ void loop()
     switch (FSM) {
       case 0:
         contadorCiclo = millis();
-        contadorLecturapresion = millis();
-        currentPulses = 0;
+        //        contadorLecturapresion = millis();
         FSM = 1;
         digitalWrite(dirPin, HIGH); // Up
-        vel = inhaleSpeed;
-        jog = HIGH;
-        long t2 = micros();
+        motor.moveTo(1000);
         break;
 
       case 1: // Inhalation Cycle
@@ -448,15 +439,13 @@ void loop()
         }
 
         if ((setPressure < readPressure()) || (currentPulses >= maxPulses)) {
-          jog = LOW;
-          long dt = micros() - t2;
-          Serial.println(dt);
+          motor.stop();
         }
 
         if ((millis() - contadorCiclo) >= int(inhaleTime * 1000)) { // Condition to change state
           contadorCiclo = millis();
           FSM = 2;
-          //          jog = HIGH;
+          motor.moveTo(-100);
           vel = exhaleSpeed;
           digitalWrite(dirPin, LOW);
         }
@@ -464,10 +453,10 @@ void loop()
         break;
 
       case 2: // Exhalation Cycle
-        if (!digitalRead(sensorPin))
-          jog = LOW;
-
-        currentPulses = 0;
+        if (!digitalRead(sensorPin)) {
+          motor.stop();
+          motor.setCurrentPosition(0);
+        }
 
         if ((millis() - contadorCiclo) >= int(exhaleTime * 1000)) {
           FSM = 0;
@@ -513,14 +502,8 @@ float readPressure() {
 
 ISR(TIMER1_COMPA_vect) {
   motor.run();
-//  if (jog) {
-//    frecTimer++;
-//    if (frecTimer > 100 / (vel)) {
-//      digitalWrite(pulsePin, !digitalRead(pulsePin));
-//      frecTimer = 0;
-//      currentPulses++;
-//    }
-//  }
+  frecTimer++;
+
 }
 
 
