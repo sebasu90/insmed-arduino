@@ -512,14 +512,15 @@ float readPressure() {
 //}
 
 ISR(TIMER1_COMPA_vect) {
-  if (jog) {
-    frecTimer++;
-    if (frecTimer > 100 / (vel)) {
-      digitalWrite(pulsePin, !digitalRead(pulsePin));
-      frecTimer = 0;
-      currentPulses++;
-    }
-  }
+  motor.run();
+//  if (jog) {
+//    frecTimer++;
+//    if (frecTimer > 100 / (vel)) {
+//      digitalWrite(pulsePin, !digitalRead(pulsePin));
+//      frecTimer = 0;
+//      currentPulses++;
+//    }
+//  }
 }
 
 
