@@ -78,7 +78,7 @@ long contadorLectura = 0;
 long contadorLecturapresion = 0;
 
 int lcdTimer = 300;
-int serialTimer = 500;
+int serialTimer = 50;
 int buttonTimer = 130;
 int changeScreenTimer = 3000;
 
@@ -122,6 +122,7 @@ float exhaleTime = 0.0;
 float setPressure = 0.0;
 float pressure = 0.0;
 float pressureRead = 0;
+long offsetPresion = 0;
 
 int readEncoderValue(int index) {
   return ((encoderValue[index - 1] / 4));
@@ -143,7 +144,7 @@ boolean isButtonPushDown(void) {
 
 void setup()   //Las instrucciones solo se ejecutan una vez, despues del arranque
 {
-  Serial.begin(9600);
+  Serial.begin(115200);
 
   pinMode(encoderPinA, INPUT);
   pinMode(encoderPinB, INPUT);
@@ -186,15 +187,6 @@ void setup()   //Las instrucciones solo se ejecutan una vez, despues del arranqu
   estadoPinA = digitalRead(encoderPinA);
   estadoPinB = digitalRead(encoderPinB);
 
-  lcd.setCursor(0, 0); //Apuntamos a la direccion LCD(caracter,linea)
-  lcd.print("ASSISTED VENTILATOR");  //Escribimos texto
-  lcd.setCursor(0, 1); //Apuntamos a la direccion LCD(caracter,linea)
-  lcd.print("cm H2O:");  //Escribimos texto
-  lcd.setCursor(0, 2); //Apuntamos a la direccion LCD(caracter,linea)
-  lcd.print("t INHA:");  //Escribimos texto
-  lcd.setCursor(0, 3); //Apuntamos a la direccion LCD(caracter,linea)
-  lcd.print("t EXHA:");  //Escribimos texto
-
   contadorLCD = millis();
   contadorLectura = millis();
 
@@ -220,6 +212,40 @@ void setup()   //Las instrucciones solo se ejecutan una vez, despues del arranqu
 
   motor.setAcceleration(5000.0); // To test
 
+
+  lcd.print("                    ");
+  lcd.setCursor(0, 0);
+  lcd.print(" CALIBRACION SENSOR");
+  lcd.setCursor(0, 2);
+  lcd.print("  ASEGURE NO TENER");
+  lcd.setCursor(0, 3);
+  lcd.print("      PRESION");
+  delay(5000);
+
+  offsetPresion = ads.readADC_SingleEnded(0);
+
+  //  Serial.println(offsetPresion);
+
+  lcd.clear();
+
+  lcd.setCursor(0, 1);
+  lcd.print("    CALIBRACION");
+  lcd.setCursor(0, 2);
+  lcd.print("     TERMINADA");
+
+  delay(1000);
+
+  lcd.clear();
+
+  lcd.setCursor(0, 0);
+  lcd.print("ASSISTED VENTILATOR");
+  lcd.setCursor(0, 1);
+  lcd.print("cm H2O:");
+  lcd.setCursor(0, 2);
+  lcd.print("t INHA:");
+  lcd.setCursor(0, 3);
+  lcd.print("t EXHA:");
+
 }  //Fin del Setup
 
 /*******************************************************/
@@ -242,7 +268,7 @@ void loop()
     //    Serial.print("    FSM: ");
     //    Serial.print(FSM);
     //    Serial.print("    Pulses: ");
-    frecTimer = 0;
+    Serial.println(pressureRead);
     contadorLectura = millis();
   }
 
@@ -425,7 +451,7 @@ void loop()
         contadorCiclo = millis();
         FSM = 1;
         digitalWrite(dirPin, HIGH); // Up
-        motor.setMaxSpeed(inhaleSpeed);
+        motor.setMaxSpeed(inhaleSpeed * 5);
         motor.moveTo(maxPulses);
         break;
 
@@ -442,14 +468,14 @@ void loop()
           motor.moveTo(maxPulses);
         }
 
-        if ((motor.currentPosition( ) > maxPulses / 2) || (pressureRead > setPressure * 0.5)) {
-          motor.setMaxSpeed(inhaleSpeed / 4);
+        if ((motor.currentPosition( ) > maxPulses * 0.9) || (pressureRead > setPressure * 0.9)) {
+          motor.setMaxSpeed(inhaleSpeed * 2);
         }
 
         if ((millis() - contadorCiclo) >= int(inhaleTime * 1000)) { // Condition to change state
           contadorCiclo = millis();
           FSM = 2;
-          motor.setMaxSpeed(exhaleSpeed);
+          motor.setMaxSpeed(exhaleSpeed * 5);
           motor.moveTo(-10);
           digitalWrite(dirPin, LOW);
         }
@@ -493,7 +519,7 @@ void updateEncoder() {
 
 float readPressure() {
   adc0 = ads.readADC_SingleEnded(0);
-  return (((adc0 - 14125.0) * 5.0478) / 1000);
+  return (71.38 * (adc0 - offsetPresion) / offsetPresion);
 }
 
 ISR(TIMER1_COMPA_vect) {
