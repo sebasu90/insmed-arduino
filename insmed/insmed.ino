@@ -102,6 +102,8 @@ int exhaleSpeed = 400; // 1-100
 bool startCycle = LOW;
 bool oldValue = LOW;
 
+String bufferString;
+
 /*
 
   Max Speed is 400 RPM
@@ -297,19 +299,19 @@ void loop()
       lcd.setCursor(8, 1); //Apuntamos a la direccion LCD(caracter,linea)
       lcd.print("           ");  //Escribimos texto
       lcd.setCursor(8, 1); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print(setPressure);  //Escribimos texto
+      lcd.print(setPressure, 1); //Escribimos texto
       //      lcd.setCursor(14, 1); //Apuntamos a la direccion LCD(caracter,linea)
       //      lcd.print(pressureRead);  //Escribimos texto
 
       lcd.setCursor(8, 2); //Apuntamos a la direccion LCD(caracter,linea)
       lcd.print("          ");  //Escribimos texto
       lcd.setCursor(8, 2); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print(inhaleTime);  //Escribimos texto
+      lcd.print(inhaleTime, 1); //Escribimos texto
 
       lcd.setCursor(8, 3); //Apuntamos a la direccion LCD(caracter,linea)
       lcd.print("          ");  //Escribimos texto
       lcd.setCursor(8, 3); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print(exhaleTime);  //Escribimos texto
+      lcd.print(exhaleTime, 1); //Escribimos texto
 
       if (contCursor == 1) {
         lcd.setCursor(8, 1); //Apuntamos a la direccion LCD(caracter,linea)
@@ -327,24 +329,38 @@ void loop()
 
     else if (contCursor2 == 2) { // Pantalla 2
 
-      lcd.setCursor(8, 0); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print("          ");  //Escribimos texto
-      lcd.setCursor(8, 0); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print(pressureRead);  //Escribimos texto
+      lcd.setCursor(6, 0); //Apuntamos a la direccion LCD(caracter,linea)
+      lcd.print("     ");  //Escribimos texto
+      lcd.setCursor(6, 0); //Apuntamos a la direccion LCD(caracter,linea)
+      //      sprintf(bufferString, "%2.1f", );
+      //      dtostrf(pressureRead, 2, 1, bufferString);
+      lcd.print(pressureRead, 1); //Escribimos texto
 
-      lcd.setCursor(8, 1); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print("          ");  //Escribimos texto
-      lcd.setCursor(8, 1); //Apuntamos a la direccion LCD(caracter,linea)
+      lcd.setCursor(16, 0); //Apuntamos a la direccion LCD(caracter,linea)
+      lcd.print(setPressure, 1);  //Escribimos texto
+
+      lcd.setCursor(6, 1); //Apuntamos a la direccion LCD(caracter,linea)
+      lcd.print("    ");  //Escribimos texto
+      lcd.setCursor(6, 1); //Apuntamos a la direccion LCD(caracter,linea)
       lcd.print(int(60 / (inhaleTime + exhaleTime))); //Escribimos texto
 
-      lcd.setCursor(8, 2); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print("          ");  //Escribimos texto
-      lcd.setCursor(8, 2); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print(float(exhaleTime) / float(inhaleTime)); //Escribimos texto
+      lcd.setCursor(17, 1); //Apuntamos a la direccion LCD(caracter,linea)
+      lcd.print(inhaleTime, 1);  //Escribimos texto
 
-      lcd.setCursor(8, 3); //Apuntamos a la direccion LCD(caracter,linea)
+      lcd.setCursor(6, 2); //Apuntamos a la direccion LCD(caracter,linea)
+      lcd.print("    ");  //Escribimos texto
+      lcd.setCursor(6, 2); //Apuntamos a la direccion LCD(caracter,linea)
+      float ratio = float(exhaleTime) / float(inhaleTime);
+      //      dtostrf(ratio,1, 1, bufferString);
+      lcd.print(ratio, 1); //Escribimos texto
+      //      lcd.print(float(exhaleTime) / float(inhaleTime)); //Escribimos texto
+
+      lcd.setCursor(17, 2); //Apuntamos a la direccion LCD(caracter,linea)
+      lcd.print(exhaleTime, 1);  //Escribimos texto
+
+      lcd.setCursor(6, 3); //Apuntamos a la direccion LCD(caracter,linea)
       lcd.print("          ");  //Escribimos texto
-      lcd.setCursor(8, 3); //Apuntamos a la direccion LCD(caracter,linea)
+      lcd.setCursor(6, 3); //Apuntamos a la direccion LCD(caracter,linea)
       lcd.print(maxPosition); //Escribimos texto
 
     } // End if pantalla 1
@@ -395,30 +411,37 @@ void loop()
   if ((millis() - contadorBoton2) > changeScreenTimer) {
     contadorBoton2 = millis();
 
-    if (contCursor2 == 0) {
-      contCursor2 = 1;
-      contCursor = 0;
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("     PARAMETERS");  //Escribimos texto
-      lcd.setCursor(0, 1);
-      lcd.print("VOLUME:");  //Escribimos texto
-      lcd.setCursor(0, 2);
-      lcd.print("UP SPEED:");  //Escribimos texto
-      lcd.setCursor(0, 3);
-      lcd.print("DN SPEED:");  //Escribimos texto
-    }
+    //    if (contCursor2 == 0) {
+    //      contCursor2 = 1;
+    //      contCursor = 0;
+    //      lcd.clear();
+    //      lcd.setCursor(0, 0);
+    //      lcd.print("     PARAMETERS");  //Escribimos texto
+    //      lcd.setCursor(0, 1);
+    //      lcd.print("VOLUME:");  //Escribimos texto
+    //      lcd.setCursor(0, 2);
+    //      lcd.print("UP SPEED:");  //Escribimos texto
+    //      lcd.setCursor(0, 3);
+    //      lcd.print("DN SPEED:");  //Escribimos texto
+    //    }
 
-    else if (contCursor2 == 1) {
+    if (contCursor2 == 0) {
       contCursor2 = 2;
       contCursor = 0;
+      lcd.noBlink();
       lcd.clear();
       lcd.setCursor(0, 0);
-      lcd.print("cm H2O:");
+      lcd.print("cmH2O:");
+      lcd.setCursor(12, 0);
+      lcd.print("SP:");
       lcd.setCursor(0, 1);
       lcd.print("BPM:");
+      lcd.setCursor(12, 1);
+      lcd.print("tIN:");
       lcd.setCursor(0, 2);
-      lcd.print("E/I:");
+      lcd.print("I:E:");
+      lcd.setCursor(12, 2);
+      lcd.print("tEX:");
       lcd.setCursor(0, 3);
       lcd.print("Vt:");
     }
