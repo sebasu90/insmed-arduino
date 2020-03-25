@@ -37,6 +37,8 @@ int pulsePin = A0;
 int dirPin = A2;
 int enPin = A1;
 
+bool hysterisis = LOW;
+
 long frecTimer;
 
 SoftwareSerial BT (BT_Rx, BT_Tx);
@@ -124,6 +126,8 @@ float pressure = 0.0;
 float pressureRead = 0;
 long offsetPresion = 0;
 
+float error = 0.05;
+
 int readEncoderValue(int index) {
   return ((encoderValue[index - 1] / 4));
 }
@@ -210,7 +214,7 @@ void setup()   //Las instrucciones solo se ejecutan una vez, despues del arranqu
   inhaleSpeed = readEncoderValue(5);
   exhaleSpeed = readEncoderValue(6);
 
-  motor.setAcceleration(5000.0); // To test
+  motor.setAcceleration(4000.0); // To test
 
 
   lcd.print("                    ");
@@ -268,7 +272,14 @@ void loop()
     //    Serial.print("    FSM: ");
     //    Serial.print(FSM);
     //    Serial.print("    Pulses: ");
-    Serial.println(pressureRead);
+    Serial.print(setPressure + 2.0);
+    Serial.print("\t");
+    Serial.print(setPressure - 2.0);
+    Serial.print("\t");
+    Serial.print(pressureRead);
+    Serial.print("\t");
+    Serial.println(setPressure);
+
     contadorLectura = millis();
   }
 
@@ -386,6 +397,20 @@ void loop()
       lcd.setCursor(0, 3);
       lcd.print("t EXHA:");
     }
+
+        else if (contCursor2 == 2) {
+      contCursor2 = 0;
+      contCursor = 0;
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("ASSISTED VENTILATOR");
+      lcd.setCursor(0, 1);
+      lcd.print("cm H2O:");
+      lcd.setCursor(0, 2);
+      lcd.print("t INHA:");
+      lcd.setCursor(0, 3);
+      lcd.print("t EXHA:");
+    }
   }
 
   if ((millis() - contadorBoton) > buttonTimer) {
@@ -456,21 +481,27 @@ void loop()
         break;
 
       case 1: // Inhalation Cycle
-        if ((millis() - contadorLecturapresion) > 50) {
-          contadorLecturapresion = millis();
-        }
+        //        if ((millis() - contadorLecturapresion) > 50) {
+        //          contadorLecturapresion = millis();
+        //        }
 
         if (setPressure < pressureRead) {
           motor.stop();
+          hysterisis = HIGH;
         }
 
-        if (pressureRead < setPressure * 0.95) {
+        if ((pressureRead < setPressure * 0.95) && hysterisis) {
           motor.moveTo(maxPulses);
+          hysterisis = LOW;
         }
 
-        if ((motor.currentPosition( ) > maxPulses * 0.9) || (pressureRead > setPressure * 0.9)) {
-          motor.setMaxSpeed(inhaleSpeed * 2);
+        if (((motor.currentPosition( ) > maxPulses * 0.9) || (pressureRead > setPressure * 0.85)) && (motor.maxSpeed() > 100.0)) {
+          motor.setMaxSpeed(120); //Cte
         }
+
+        //        if ((pressureRead < setPressure * 0.75) && (motor.currentPosition( ) < maxPulses * 0.9)) {
+        //          motor.setMaxSpeed(inhaleSpeed * 5); //Cte
+        //        }
 
         if ((millis() - contadorCiclo) >= int(inhaleTime * 1000)) { // Condition to change state
           contadorCiclo = millis();
