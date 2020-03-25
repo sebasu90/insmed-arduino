@@ -92,6 +92,7 @@ int maxPulses = 600; // Mechanical limit of the CAM
 int currentPulses = 0;
 int maxFrec = 10000;
 int numInterrupts;
+int maxPosition;
 
 int delaymicros;
 
@@ -294,11 +295,11 @@ void loop()
       exhaleTime = readEncoderValue(3) / 10.0;
 
       lcd.setCursor(8, 1); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print("          ");  //Escribimos texto
+      lcd.print("           ");  //Escribimos texto
       lcd.setCursor(8, 1); //Apuntamos a la direccion LCD(caracter,linea)
       lcd.print(setPressure);  //Escribimos texto
-      lcd.setCursor(14, 1); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print(readPressure());  //Escribimos texto
+      //      lcd.setCursor(14, 1); //Apuntamos a la direccion LCD(caracter,linea)
+      //      lcd.print(pressureRead);  //Escribimos texto
 
       lcd.setCursor(8, 2); //Apuntamos a la direccion LCD(caracter,linea)
       lcd.print("          ");  //Escribimos texto
@@ -321,6 +322,30 @@ void loop()
       if (contCursor == 3) {
         lcd.setCursor(8, 3); //Apuntamos a la direccion LCD(caracter,linea)
       }
+
+    } // End if pantalla 1
+
+    else if (contCursor2 == 2) { // Pantalla 2
+
+      lcd.setCursor(8, 0); //Apuntamos a la direccion LCD(caracter,linea)
+      lcd.print("          ");  //Escribimos texto
+      lcd.setCursor(8, 0); //Apuntamos a la direccion LCD(caracter,linea)
+      lcd.print(pressureRead);  //Escribimos texto
+
+      lcd.setCursor(8, 1); //Apuntamos a la direccion LCD(caracter,linea)
+      lcd.print("          ");  //Escribimos texto
+      lcd.setCursor(8, 1); //Apuntamos a la direccion LCD(caracter,linea)
+      lcd.print(int(60 / (inhaleTime + exhaleTime))); //Escribimos texto
+
+      lcd.setCursor(8, 2); //Apuntamos a la direccion LCD(caracter,linea)
+      lcd.print("          ");  //Escribimos texto
+      lcd.setCursor(8, 2); //Apuntamos a la direccion LCD(caracter,linea)
+      lcd.print(float(exhaleTime) / float(inhaleTime)); //Escribimos texto
+
+      lcd.setCursor(8, 3); //Apuntamos a la direccion LCD(caracter,linea)
+      lcd.print("          ");  //Escribimos texto
+      lcd.setCursor(8, 3); //Apuntamos a la direccion LCD(caracter,linea)
+      lcd.print(maxPosition); //Escribimos texto
 
     } // End if pantalla 1
 
@@ -385,20 +410,20 @@ void loop()
     }
 
     else if (contCursor2 == 1) {
-      contCursor2 = 0;
+      contCursor2 = 2;
       contCursor = 0;
       lcd.clear();
       lcd.setCursor(0, 0);
-      lcd.print("ASSISTED VENTILATOR");
-      lcd.setCursor(0, 1);
       lcd.print("cm H2O:");
+      lcd.setCursor(0, 1);
+      lcd.print("BPM:");
       lcd.setCursor(0, 2);
-      lcd.print("t INHA:");
+      lcd.print("E/I:");
       lcd.setCursor(0, 3);
-      lcd.print("t EXHA:");
+      lcd.print("Vt:");
     }
 
-        else if (contCursor2 == 2) {
+    else if (contCursor2 == 2) {
       contCursor2 = 0;
       contCursor = 0;
       lcd.clear();
@@ -505,6 +530,7 @@ void loop()
 
         if ((millis() - contadorCiclo) >= int(inhaleTime * 1000)) { // Condition to change state
           contadorCiclo = millis();
+          maxPosition = motor.currentPosition();
           FSM = 2;
           motor.setMaxSpeed(exhaleSpeed * 5);
           motor.moveTo(-10);
