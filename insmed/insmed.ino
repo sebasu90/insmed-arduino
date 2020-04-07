@@ -319,8 +319,8 @@ void loop() {
     alarmaBateria = HIGH;
   }
   else {
-    alarmaBateriaOld = LOW;
     alarmaBateria = LOW;
+    alarmaBateriaOld = LOW;
   }
 
   if (digitalRead(eStopPin)) {
@@ -331,7 +331,7 @@ void loop() {
     alarmaeStopOld = LOW;
   }
 
-  if (((alarmaSensor || alarmaPresionAlta || alarmaPresionBaja || alarmaAmbu || alarmaSensor2) && startCycle) || alarmaBloqueo || alarmaBateria || alarmaeStop) {
+  if (((alarmaSensor || alarmaPresionAlta || alarmaPresionBaja || alarmaAmbu || alarmaSensor2 || alarmaBloqueo) && startCycle) || alarmaBateria || alarmaeStop) {
     digitalWrite(alarmPin, HIGH);
     alarmas = HIGH;
   }
