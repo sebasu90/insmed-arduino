@@ -136,8 +136,8 @@ long numCiclosOld;
 int presControlOld;
 int bpmOld;
 float ieRatioOld;
-float peepPressureLCDOld=98;
-float maxPressureLCDOld=98;
+float peepPressureLCDOld = 98;
+float maxPressureLCDOld = 98;
 
 #define maxnumCiclos 60000
 long numCiclos; // Not so frequecnt EEPROM write
@@ -325,14 +325,14 @@ void loop() {
     //    Serial.print("\t");
     //    Serial.println(motor.speed());
 
-    //    Serial.print(setPressure * 1.1);
-    //    Serial.print("\t");
-    //    Serial.print(setPressure * 0.9);
-    //    Serial.print("\t");
-    //    Serial.print(maxPressure);
-    //    maxPressure = 0.0;
-    //    Serial.print("\t");
-    //    Serial.println(setPressure);
+    Serial.print(setPressure * 1.1);
+    Serial.print("\t");
+    Serial.print(setPressure * 0.9);
+    Serial.print("\t");
+    Serial.print(maxPressure);
+    maxPressure = 0.0;
+    Serial.print("\t");
+    Serial.println(setPressure);
 
     contadorLectura = millis();
 
@@ -527,6 +527,9 @@ void loop() {
     numAlarmas = 0;
     numCol = 0;
     contCursor = 0;
+    presControlOld = 98;
+    bpmOld = 98;
+    ieRatioOld = 98;
     cargarLCD ();
   }
 
@@ -717,11 +720,11 @@ void loop() {
   } // End machine cycle
   dt3 = millis() - t3;
 
-  Serial.print(dt1);
-  Serial.print('\t');
-  Serial.print(dt2);
-  Serial.print('\t');
-  Serial.println(dt3);
+  //  Serial.print(dt1);
+  //  Serial.print('\t');
+  //  Serial.print(dt2);
+  //  Serial.print('\t');
+  //  Serial.println(dt3);
 }  //End Loop
 
 void updateEncoder() {
