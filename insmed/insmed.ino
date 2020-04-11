@@ -4,9 +4,9 @@
 
 #include <EEPROM.h>
 #include <Wire.h>
-#include <LiquidCrystal_I2C.h>
-#include <Adafruit_ADS1015.h>
-#include <AccelStepper.h>
+#include "src/LiquidCrystal_I2C/LiquidCrystal_I2C.h"
+#include "src/Adafruit_ADS1X15/Adafruit_ADS1015.h"
+#include "src/AccelStepper/AccelStepper.h"
 
 LiquidCrystal_I2C lcd(0x27, 20, 4);
 
