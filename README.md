@@ -1,1 +1,1 @@
-# insmed-arduino
+# InnspiraMED Arduino
