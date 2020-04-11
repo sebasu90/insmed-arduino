@@ -1,65 +1,86 @@
 /**
-
   TO DO:
-
-  Limit inputs
-  Calculate indirect varaibles (%O2, flow)
-  Comment and translate to English
-  Non-blocking stepper (Timers)
-  Read pressure sensor faster
-  Send pressure BT and timestamp
-
-  Button switch change up
-
-  Timer 1{
-  cont++
-  if cont>set
-    toogle pin
-    cont=0;
-  }
-
 */
 
 #include <EEPROM.h>
-#include <Wire.h>  // Libreria de comunicacion I2C/TWI de Arduino IDE
-#include <LiquidCrystal_I2C.h>  // Libreria LCD-I2C de fmalpartida
-#include <SoftwareSerial.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
 #include <Adafruit_ADS1015.h>
+#include <AccelStepper.h>
 
-SoftwareSerial BT (5, 6);
 LiquidCrystal_I2C lcd(0x27, 20, 4);
 
 Adafruit_ADS1115 ads(0x48);
 
-int encoderPinA = 2;
-int encoderPinB = 3;
-int buttonPin = 4;
-int sensorPin = 11;
+// Pin definitions
+#define encoderPinA 2 // Throttle
+#define encoderPinB 3
+#define buttonPin 4
 
-int vel;
+#define batteryPin 9
+#define eStopPin 10
+#define sensorPin 11 // Inductive sensor to control motor range
+#define startButton 12 // Start switch
 
-long frecTimer;
+// Motor outputs
+#define pulsePin A0
+#define dirPin A2
+#define enPin A1
+#define alarmPin 7
 
-int pulsePin = A0;
-int dirPin = A2;
-int enPin = A1;
+bool goHome = LOW;
 
-long timerOn = 0;
+bool alarmaSensor = LOW;
+bool alarmaSensor2 = LOW;
+bool alarmaPresionAlta = LOW;
+bool alarmaPresionBaja = LOW;
+bool alarmaAmbu = LOW;
+bool alarmaBloqueo = LOW;
+bool alarmaBateria = LOW;
 
-int startButton = 12;
+bool alarmas = LOW;
+bool oldAlarmas = LOW; // Rising edge to clear screen
+
+byte numAlarmas = 0;
+byte numCol = 0;
+
+bool newAlarm = LOW;
+
+bool alarmaSensorOld = LOW;
+bool alarmaPresionAltaOld = LOW;
+bool alarmaPresionBajaOld = LOW;
+bool alarmaSensor2Old = LOW;
+bool alarmaAmbuOld = LOW;
+bool alarmaBloqueoOld = LOW;
+bool alarmaBateriaOld = LOW;
+
+bool alarmaeStop = LOW;
+bool alarmaeStopOld = LOW;
+
+float pressMinLimit = 4.0;
+float pressMaxLimit = 41.0;
+
+float pressMinMovil = 0.0;
+float pressMaxMovil = 0.0;
+
+bool resetAlarmas = LOW;
+
+bool hysterisis = LOW;
+
+byte contadorAlarmaPresionBaja = 0;
+
+AccelStepper motor(AccelStepper::DRIVER, pulsePin, dirPin);
 
 volatile int lastEncoded = 0;
-volatile int encoderValue[6];
-
-int16_t adc0;
-
+volatile int encoderValue[10];
 long lastencoderValue = 0;
 
-int lastMSB = 0;
-int lastLSB = 0;
+int16_t adc0; // ADS1015 reading
 
-int contCursor = 0;
-int contCursor2 = 0;
+// Manage the LDC cursor and screens
+
+byte contCursor = 0;
+byte contCursor2 = 0;
 
 long currentTime;
 
@@ -68,9 +89,6 @@ bool Start = false;
 bool botonAnterior;
 
 bool Read = LOW;
-bool jog;
-
-bool estadoPinA, estadoPinB;
 
 bool estadoBoton = false;
 long contadorBoton = 0;
@@ -80,48 +98,58 @@ long contadorCiclo = 0;
 long contadorControl = 0;
 long contadorLectura = 0;
 long contadorLecturapresion = 0;
+long contadorHorometro = 0;
 
-int index = 0;
-int FSM;
+bool refreshLCD = LOW;
+bool checkSensor = LOW;
 
-int pulsePerRevolution = 400; // Set in the stepper driver
-int maxPulses = 600; // Mechanical limit of the CAM
-int currentPulses = 0;
-int maxFrec = 10000;
-int numInterrupts;
+long t1;
 
-int delaymicros;
+#define lcdTimer 400
+#define serialTimer 100
+#define buttonTimer 110
+#define changeScreenTimer 2000
 
-int inhaleSpeed = 60; // 1-100
-int exhaleSpeed = 400; // 1-100
+byte index = 0;
+byte FSM;
+
+int maxPosition = 3400;
+int inhaleSpeed = 3000;
+int exhaleSpeed = 3200;
+
+signed int minPosition = -4400;
+
+//int maxPosition = 3500;
+//int inhaleSpeed = 3000;
+//int exhaleSpeed = 3000;
 
 bool startCycle = LOW;
-bool oldValue = LOW;
 
-/*
+#define maxnumCiclos 60000
+long numCiclos; // Not so frequecnt EEPROM write
+byte updatenumCiclos = 0;
 
-  Max Speed is 400 RPM
-  Max frec = 400 RPM * 400 ppr / 60 = 2.66 kHz ~ 2.5 kHz
-  T = 400 us (100% speed)
-  Delay Time = 20.000 us / Speed
+//String bufferString;
 
-  Max pulses = Max degrees CAM * 2 rev stepper * 400 Pulses     800 * Max degree CAM
-                                 -------------   ----------- =
-                                  1 rev CAM     1 rev stepper
+float maxPressure;  // Serial
+float maxPressure2; // LCD
+float peepPressure = 0.0; // LCD
 
-*/
+//float compliance;
+//float Volumen;
 
 // Process Variables
-
-bool cycleON = LOW;
 
 float inhaleTime = 0.0;
 float exhaleTime = 0.0;
 
+float presControl;
 float setPressure = 0.0;
 float pressure = 0.0;
+float pressureRead = 0;
+long offsetPresion = 0;
 
-int readEncoderValue(int index) {
+int readEncoderValue(byte index) {
   return ((encoderValue[index - 1] / 4));
 }
 
@@ -141,33 +169,34 @@ boolean isButtonPushDown(void) {
 
 void setup()   //Las instrucciones solo se ejecutan una vez, despues del arranque
 {
-  Serial.begin(9600);
+  Serial.begin(115200);
 
   pinMode(encoderPinA, INPUT);
   pinMode(encoderPinB, INPUT);
   pinMode(buttonPin, INPUT);
   pinMode(startButton, INPUT);
   pinMode(sensorPin, INPUT);
+  pinMode(batteryPin, INPUT);
+  pinMode(eStopPin, INPUT);
+
+  pinMode(enPin, OUTPUT);
+  pinMode(alarmPin, OUTPUT);
 
   pinMode(pulsePin, OUTPUT);
   pinMode(dirPin, OUTPUT);
-  pinMode(enPin, OUTPUT);
 
   digitalWrite(encoderPinA, HIGH); //turn pullup resistor on
   digitalWrite(encoderPinB, HIGH); //turn pullup resistor on
 
-  //call updateEncoder() when any high/low changed seen
-  //on interrupt 0 (pin 2), or interrupt 1 (pin 3)
   attachInterrupt(0, updateEncoder, CHANGE);
   attachInterrupt(1, updateEncoder, CHANGE);
 
   cli();//stop interrupts
-  //set timer1 interrupt at 1Hz
   TCCR1A = 0;// set entire TCCR1A register to 0
   TCCR1B = 0;// same for TCCR1B
   TCNT1  = 0;//initialize counter value to 0
   // set compare match register for 1hz increments
-  OCR1A = 1600;// = (16*10^6) / (1*1) - 1 (must be <65536)
+  OCR1A = 3200;// = Crystal of 16Mhz / 3200 cycles = 5 kHz Timer 1 frequency
   // turn on CTC mode
   TCCR1B |= (1 << WGM12);
   // Set CS10 for no prescaler
@@ -181,25 +210,12 @@ void setup()   //Las instrucciones solo se ejecutan una vez, despues del arranqu
   lcd.clear();
   lcd.backlight();
 
-  estadoPinA = digitalRead(encoderPinA);
-  estadoPinB = digitalRead(encoderPinB);
-
-  lcd.setCursor(0, 0); //Apuntamos a la direccion LCD(caracter,linea)
-  lcd.print("ASSISTED VENTILATOR");  //Escribimos texto
-  lcd.setCursor(0, 1); //Apuntamos a la direccion LCD(caracter,linea)
-  lcd.print("cm H2O:");  //Escribimos texto
-  lcd.setCursor(0, 2); //Apuntamos a la direccion LCD(caracter,linea)
-  lcd.print("t INHA:");  //Escribimos texto
-  lcd.setCursor(0, 3); //Apuntamos a la direccion LCD(caracter,linea)
-  lcd.print("t EXHA:");  //Escribimos texto
-
   contadorLCD = millis();
   contadorLectura = millis();
 
-  BT.begin(9600);
   ads.begin();
 
-  delaymicros = 50000000 / maxFrec;
+  // Read from EEPROM the machine's parameters
 
   EEPROM.get(10, encoderValue[0]);
   EEPROM.get(20, encoderValue[1]);
@@ -207,14 +223,49 @@ void setup()   //Las instrucciones solo se ejecutan una vez, despues del arranqu
   EEPROM.get(40, encoderValue[3]);
   EEPROM.get(50, encoderValue[4]);
   EEPROM.get(60, encoderValue[5]);
+  EEPROM.get(70, encoderValue[6]);
+  EEPROM.get(80, numCiclos);
 
   setPressure = readEncoderValue(1) / 10.0;
   inhaleTime = readEncoderValue(2) / 10.0;
   exhaleTime = readEncoderValue(3) / 10.0;
 
-  maxPulses = readEncoderValue(4);
-  inhaleSpeed = readEncoderValue(5);
-  exhaleSpeed = readEncoderValue(6);
+  //  maxPulses = readEncoderValue(4);
+  //  inhaleSpeed = readEncoderValue(5);
+  //  exhaleSpeed = readEncoderValue(6);
+  //  lowSpeed = readEncoderValue(7);
+
+  motor.setAcceleration(20000.0); // To test
+  motor.setMinPulseWidth(35);
+
+  lcd.setCursor(0, 0);
+  lcd.print(F(" CALIBRACION SENSOR"));
+  lcd.setCursor(0, 2);
+  lcd.print(F("  ASEGURE PRESION"));
+  lcd.setCursor(0, 3);
+  lcd.print(F("     AMBIENTE"));
+  delay(2000);
+
+  offsetPresion = ads.readADC_SingleEnded(0);
+
+  lcd.clear();
+
+  lcd.setCursor(0, 1);
+  lcd.print(F("    CALIBRACION"));
+  lcd.setCursor(0, 2);
+  lcd.print(F("     TERMINADA"));
+
+  delay(1000);
+
+  cargarLCD ();
+  contCursor2 = 2;
+  //  motor.setCurrentPosition(0);
+  //  digitalWrite(enPin, LOW); // Enable motor
+  //  delay(50);
+  //  goHome = HIGH;
+  //  motor.setMaxSpeed(600);
+  //  motor.moveTo(-10000);
+  t1 = millis();
 
 }  //Fin del Setup
 
@@ -222,105 +273,292 @@ void setup()   //Las instrucciones solo se ejecutan una vez, despues del arranqu
 
 /*******************( LOOP )****************************/
 
-void loop()
-{
+void loop() {
 
-  if ((millis() - contadorLectura) > 10) {
-    //    timerOn++;
-    pressure = readPressure();
+  //  if ((!digitalRead(sensorPin)) && goHome) {
+  //    motor.setMaxSpeed(0);
+  //    motor.stop();
+  //    motor.setCurrentPosition(0);
+  //    digitalWrite(enPin, HIGH); // Enable motor
+  //    delay(500);
+  //    goHome = LOW;
+  //  }
+
+  // Imprimir Serial ////////////////////////////////////
+
+  if ((millis() - contadorLectura) > serialTimer) {
+    //    Protocolo BlueTooth
+    //
     //    outputString = 't';
-    //    outputString += timerOn;
+    //    outputString += millis();
     //    outputString += 'p';
-    outputString += pressure;
+    //    outputString += maxPressure;
     //    outputString += ';';
+    //    Serial.print(outputString);
 
-    //    Serial.print("FrecTimer: ");
-    //    Serial.print(frecTimer);
-    //    Serial.print("    FSM: ");
+    // Prueba motor
     //    Serial.print(FSM);
-    //    Serial.print("    Pulses: ");
-    Serial.println(pressure);
+    //    Serial.print("\t");
+    //    Serial.print(motor.currentPosition());
+    //    Serial.print("\t");
+    //    Serial.print(motor.targetPosition());
+    //    Serial.print("\t");
+    //    Serial.println(motor.speed());
+
+    Serial.print(setPressure * 1.1);
+    Serial.print("\t");
+    Serial.print(setPressure * 0.9);
+    Serial.print("\t");
+    Serial.print(maxPressure);
+    maxPressure = 0.0;
+    Serial.print("\t");
+    Serial.println(setPressure);
 
     contadorLectura = millis();
+
+  } // End Serial
+
+  //  Serial.println(millis() - t1);
+  //  t1 = millis();
+
+  if (digitalRead(batteryPin)) {
+    delay(3);
+    if (digitalRead(batteryPin)) {
+      delay(3);
+      if (digitalRead(batteryPin)) {
+        alarmaBateria = HIGH;
+        digitalWrite(alarmPin, HIGH);
+      }
+    }
   }
 
-  if ((millis() - contadorLCD) > 300) { // Refresh LCD
+  else {
+    alarmaBateria = LOW;
+    alarmaBateriaOld = LOW;
+  }
 
-    contadorLCD = millis();
+  if (digitalRead(eStopPin)) {
+    alarmaeStop = HIGH;
+  }
+  else {
+    alarmaeStop = LOW;
+    alarmaeStopOld = LOW;
+  }
 
-    if (contCursor2 == 0) { // Pantalla 1
+  if (((alarmaSensor || alarmaPresionAlta || alarmaPresionBaja || alarmaAmbu || alarmaSensor2 || alarmaBloqueo) && startCycle) || alarmaeStop) {
+    alarmas = HIGH;
+  }
 
-      setPressure = readEncoderValue(1) / 10.0;
-      inhaleTime = readEncoderValue(2) / 10.0;
-      exhaleTime = readEncoderValue(3) / 10.0;
+  if (alarmas || alarmaBateria)
+    digitalWrite(alarmPin, HIGH);
+  else
+    digitalWrite(alarmPin, LOW);
 
-      lcd.setCursor(8, 1); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print("          ");  //Escribimos texto
-      lcd.setCursor(8, 1); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print(setPressure);  //Escribimos texto
-      lcd.setCursor(14, 1); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print(readPressure());  //Escribimos texto
+  if (alarmaeStop && !alarmaeStopOld) {
+    alarmaeStopOld = HIGH;
+    newAlarm = HIGH;
+  }
 
-      lcd.setCursor(8, 2); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print("          ");  //Escribimos texto
-      lcd.setCursor(8, 2); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print(inhaleTime);  //Escribimos texto
+  if (alarmaSensor && !alarmaSensorOld) {
+    alarmaSensorOld = HIGH;
+    newAlarm = HIGH;
+  }
 
-      lcd.setCursor(8, 3); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print("          ");  //Escribimos texto
-      lcd.setCursor(8, 3); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print(exhaleTime);  //Escribimos texto
+  if (alarmaPresionAlta && !alarmaPresionAltaOld) {
+    alarmaPresionAltaOld = HIGH;
+    newAlarm = HIGH;
+  }
 
-      if (contCursor == 1) {
-        lcd.setCursor(8, 1); //Apuntamos a la direccion LCD(caracter,linea)
+  if (alarmaPresionBaja && !alarmaPresionBajaOld) {
+    alarmaPresionBajaOld = HIGH;
+    newAlarm = HIGH;
+  }
+
+  if (alarmaAmbu && !alarmaAmbuOld) {
+    alarmaAmbuOld = HIGH;
+    newAlarm = HIGH;
+  }
+
+  if (alarmaSensor2 && !alarmaSensor2Old) {
+    alarmaSensor2Old = HIGH;
+    newAlarm = HIGH;
+  }
+
+  if (alarmaBloqueo && !alarmaBloqueoOld) {
+    alarmaBloqueoOld = HIGH;
+    newAlarm = HIGH;
+  }
+
+  //  if (alarmaBateria && !alarmaBateriaOld) {
+  //    alarmaBateriaOld = HIGH;
+  //    newAlarm = HIGH;
+  //  }
+
+  if (alarmas && !oldAlarmas) {
+    //    lcd.noCursor();
+    //    lcd.clear();
+    //    numAlarmas = 0;
+    //    numCol = 0;
+    //    contCursor = 0;
+    //    oldAlarmas = HIGH;
+  }
+
+  // Refrescar LCD // Solo se hace en Stop o al fin del ciclo
+
+  if (((FSM == 2) && ((refreshLCD && !alarmas) || newAlarm)) || (!startCycle && (!alarmas || newAlarm))) {
+    if ((millis() - contadorLCD) > lcdTimer) { // Refresh LCD
+      contadorLCD = millis();
+
+      if (newAlarm) {
+        if (numAlarmas == 0) {
+          lcd.noCursor();
+          lcd.clear();
+        }
+        if (alarmaPresionAlta) {
+          if (numAlarmas > 3) {
+            numAlarmas = 0;
+            numCol = 10;
+          }
+          lcd.setCursor(numCol, numAlarmas);
+          lcd.print(F("          "));
+          lcd.setCursor(numCol, numAlarmas);
+          lcd.print(F(" P. ALTA"));
+          numAlarmas++;
+        }
+        if (alarmaPresionBaja) {
+          if (numAlarmas > 3) {
+            numAlarmas = 0;
+            numCol = 10;
+          }
+          lcd.setCursor(numCol, numAlarmas);
+          lcd.print(F("          "));
+          lcd.setCursor(numCol, numAlarmas);
+          lcd.print(F(" P. BAJA"));
+          numAlarmas++;
+        }
+        if (alarmaSensor || alarmaSensor2) {
+          if (numAlarmas > 3) {
+            numAlarmas = 0;
+            numCol = 10;
+          }
+          lcd.setCursor(numCol, numAlarmas);
+          lcd.print(F("          "));
+          lcd.setCursor(numCol, numAlarmas);
+          lcd.print(F("MECANISMO"));
+          numAlarmas++;
+        }
+
+        if (alarmaAmbu) {
+          if (numAlarmas > 3) {
+            numAlarmas = 0;
+            numCol = 10;
+          }
+          lcd.setCursor(numCol, numAlarmas);
+          lcd.print(F("          "));
+          lcd.setCursor(numCol, numAlarmas);
+          lcd.print(F("CAMBIO AMBU"));
+          numAlarmas++;
+        }
+        if (alarmaBloqueo) {
+          if (numAlarmas > 3) {
+            numCol = 10;
+            numAlarmas = 0;
+          }
+          lcd.setCursor(numCol, numAlarmas);
+          lcd.print(F("          "));
+          lcd.setCursor(numCol, numAlarmas);
+          lcd.print(F(" BLOQUEO"));
+          numAlarmas++;
+        }
+
+        //        if (alarmaBateria) {
+        //          if (numAlarmas > 3) {
+        //            numAlarmas = 0;
+        //            numCol = 10;
+        //          }
+        //          lcd.setCursor(numCol, numAlarmas);
+        //          lcd.print(F("          "));
+        //          lcd.setCursor(numCol, numAlarmas);
+        //          lcd.print(F(" BATERIA"));
+        //          numAlarmas++;
+        //        }
+
+        if (alarmaeStop) {
+          if (numAlarmas > 3) {
+            numAlarmas = 0;
+            numCol = 10;
+          }
+          lcd.setCursor(numCol, numAlarmas);
+          lcd.print(F("          "));
+          lcd.setCursor(numCol, numAlarmas);
+          lcd.print(F("  E STOP"));
+          numAlarmas++;
+        }
+        newAlarm = LOW;
       }
 
-      if (contCursor == 2) {
-        lcd.setCursor(8, 2); //Apuntamos a la direccion LCD(caracter,linea)
-      }
+      else if (numAlarmas == 0) {
 
-      if (contCursor == 3) {
-        lcd.setCursor(8, 3); //Apuntamos a la direccion LCD(caracter,linea)
-      }
+        presControl = readEncoderValue(1);
+        inhaleTime = readEncoderValue(2) / 10.0;
+        exhaleTime = readEncoderValue(3) / 10.0;
 
-    } // End if pantalla 1
+        lcd.setCursor(5, 3);
+        lcd.print(F("   "));
+        lcd.setCursor(5, 3);
+        lcd.print(int(60 / (inhaleTime + exhaleTime)));  // BPM
 
-    else if (contCursor2 == 1) { // Pantalla 2
+        lcd.setCursor(17, 1);
+        lcd.print(inhaleTime, 1);
 
-      maxPulses = readEncoderValue(4);
-      inhaleSpeed = readEncoderValue(5);
-      exhaleSpeed = readEncoderValue(6);
 
-      lcd.setCursor(10, 1); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print("          ");  //Escribimos texto
-      lcd.setCursor(10, 1); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print(maxPulses);  //Escribimos texto
+        lcd.setCursor(7, 2);
+        float ratio = float(exhaleTime) / float(inhaleTime); // I:E
+        lcd.print(ratio, 1);
+        lcd.setCursor(17, 2);
+        lcd.print(exhaleTime, 1);
 
-      lcd.setCursor(10, 2); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print("          ");  //Escribimos texto
-      lcd.setCursor(10, 2); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print(inhaleSpeed);  //Escribimos texto
+        lcd.setCursor(5, 0);
+        lcd.print(F("    "));
+        lcd.setCursor(5, 0);
+        lcd.print(maxPressure2, 1); // PIP
 
-      lcd.setCursor(10, 3); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print("          ");  //Escribimos texto
-      lcd.setCursor(10, 3); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print(exhaleSpeed);  //Escribimos texto
+        lcd.setCursor(17, 0);
+        lcd.print("  ");
 
-      if (contCursor == 4) {
-        lcd.setCursor(10, 1); //Apuntamos a la direccion LCD(caracter,linea)
-      }
+        lcd.setCursor(17, 0);
+        lcd.print(presControl, 0);
 
-      if (contCursor == 5) {
-        lcd.setCursor(10, 2); //Apuntamos a la direccion LCD(caracter,linea)
-      }
+        // Aca iban //
 
-      if (contCursor == 6) {
-        lcd.setCursor(10, 3); //Apuntamos a la direccion LCD(caracter,linea)
-      }
+        //////////////
 
-    } // End if pantalla 1
+        lcd.setCursor(5, 1);
+        lcd.print("    ");
+        lcd.setCursor(5, 1); // PEEP
+        lcd.print(peepPressure, 1);
 
-  } // End refresh LCD
+        lcd.setCursor(14, 3);
+        lcd.print("      ");
+        lcd.setCursor(14, 3);
+        lcd.print(numCiclos);
+
+        if (contCursor == 1) {
+          lcd.setCursor(17, 0);
+        }
+
+        if (contCursor == 2) {
+          lcd.setCursor(17, 1);
+        }
+
+        if (contCursor == 3) {
+          lcd.setCursor(17, 2);
+        }
+
+        refreshLCD = LOW;
+      } // If no Alarmas
+    } // If refreshLCD
+  }
 
 
   if (!isButtonPushDown()) { // Anti-Bounce Button Switch
@@ -328,155 +566,208 @@ void loop()
     contadorBoton2 = millis();
   }
 
-  if ((millis() - contadorBoton2) > 3000) {
+  if (((millis() - contadorBoton2) > changeScreenTimer) && alarmas) {
     contadorBoton2 = millis();
 
-    if (contCursor2 == 0) {
-      contCursor2 = 1;
-      contCursor = 0;
-      lcd.clear();
-      lcd.setCursor(0, 0); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print("     PARAMETERS");  //Escribimos texto
-      lcd.setCursor(0, 1); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print("PULSES:");  //Escribimos texto
-      lcd.setCursor(0, 2); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print("UP SPEED:");  //Escribimos texto
-      lcd.setCursor(0, 3); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print("DN SPEED:");  //Escribimos texto
+    if (alarmaAmbu) {
+      //      numCiclos = 0;
+      //      updatenumCiclos = 0;
+      //      EEPROM.put(80, numCiclos);
+      alarmaAmbu = LOW;
+      alarmaAmbuOld = LOW;
     }
 
-    else if (contCursor2 == 1) {
-      contCursor2 = 0;
-      contCursor = 0;
-      lcd.clear();
-      lcd.setCursor(0, 0); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print("ASSISTED VENTILATOR");  //Escribimos texto
-      lcd.setCursor(0, 1); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print("cm H2O:");  //Escribimos texto
-      lcd.setCursor(0, 2); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print("t INHA:");  //Escribimos texto
-      lcd.setCursor(0, 3); //Apuntamos a la direccion LCD(caracter,linea)
-      lcd.print("t EXHA:");  //Escribimos texto
-    }
+    alarmas = LOW;
+    oldAlarmas = LOW;
+    numAlarmas = 0;
+    numCol = 0;
+    contCursor = 0;
+    cargarLCD ();
   }
 
-  if ((millis() - contadorBoton) > 120) {
+  if (((millis() - contadorBoton2) > 8000)) {
+    numCiclos = 0;
+    updatenumCiclos = 0;
+    EEPROM.put(80, numCiclos);
+  }
+
+  if (((millis() - contadorBoton) > buttonTimer) && (!alarmas || alarmaBateria)) {
     contadorBoton = millis();
-    if (contCursor2 == 0) {
-      if (contCursor == 0) {
-        lcd.blink();
-        contCursor = 1;
-      }
-
-      else if (contCursor == 1) {
-        EEPROM.put(contCursor * 10, encoderValue[contCursor - 1]);
-        contCursor = 2;
-      }
-
-      else if (contCursor == 2) {
-        EEPROM.put(contCursor * 10, encoderValue[contCursor - 1]);
-        contCursor = 3;
-      }
-
-      else if (contCursor == 3) {
-        EEPROM.put(contCursor * 10, encoderValue[contCursor - 1]);
-        lcd.noBlink();
-        contCursor = 0;
-      }
+    if (contCursor == 0) {
+      lcd.cursor();
+      contCursor = 1;
     }
 
-    else if (contCursor2 == 1) {
-      if (contCursor == 0) {
-        lcd.blink();
-        contCursor = 4;
-      }
-
-      else if (contCursor == 4) {
-        EEPROM.put(contCursor * 10, encoderValue[contCursor - 1]);
-        contCursor = 5;
-      }
-
-      else if (contCursor == 5) {
-        EEPROM.put(contCursor * 10, encoderValue[contCursor - 1]);
-        contCursor = 6;
-      }
-
-      else if (contCursor == 6) {
-        EEPROM.put(contCursor * 10, encoderValue[contCursor - 1]);
-        lcd.noBlink();
-        contCursor = 0;
-      }
+    else if (contCursor == 1) {
+      EEPROM.put(contCursor * 10, encoderValue[contCursor - 1]);
+      contCursor = 2;
     }
+
+    else if (contCursor == 2) {
+      EEPROM.put(contCursor * 10, encoderValue[contCursor - 1]);
+      contCursor = 3;
+    }
+
+    else if (contCursor == 3) {
+      EEPROM.put(contCursor * 10, encoderValue[contCursor - 1]);
+      lcd.noCursor();
+      contCursor = 0;
+    }
+
+    else if (contCursor > 3) {
+      contCursor = 0;
+      lcd.noCursor();
+    }
+  } // End If Button Switch
+
+
+  if (!startCycle || digitalRead(eStopPin)) {
+    digitalWrite(enPin, HIGH); // disable motor
   }
 
-  if (digitalRead(startButton))
-    digitalWrite(enPin, HIGH); // disable motor
-
-  //  Serial.print("Milis: ");
-  //  Serial.print((millis() - contadorCiclo));
-  //  Serial.print("    Max Pulses: ");
-  //  Serial.print(maxPulses);
-  //  Serial.print("    FSM ");
-  //  Serial.print(FSM);
-  //  Serial.print("    Pulses: ");
-  //  Serial.println(currentPulses);
-
-
-  if (!digitalRead(startButton)) { // Start
-
+  if (((!digitalRead(startButton) && !digitalRead(eStopPin)) || startCycle)) { // Start
+    startCycle = HIGH;
     digitalWrite(enPin, LOW); // Enable motor
+
+    pressureRead = readPressure(); // Once per cycle
+
+    if (pressureRead < 1.0)
+      pressureRead = 0.0;
+
+    if (numCiclos > maxnumCiclos)
+      alarmaAmbu = HIGH;
+
+    // Save the greatest value to monitor (Peaks)
+
+    if (pressureRead > maxPressure2)
+      maxPressure2 = pressureRead;
+
+    if (pressureRead > maxPressure)
+      maxPressure = pressureRead;
+
+    if ((pressureRead < peepPressure) && pressureRead > 0)
+      peepPressure = pressureRead;
+
+    if (FSM != 2) {
+      setPressure = presControl + peepPressure;
+      pressMinMovil = setPressure * 0.8;
+      pressMaxMovil = setPressure * 1.2;
+    }
+
+    if ((pressureRead > pressMaxLimit) || (pressureRead > pressMaxMovil))
+      alarmaPresionAlta = HIGH;
 
     switch (FSM) {
       case 0:
         contadorCiclo = millis();
-        contadorLecturapresion = millis();
-        currentPulses = 0;
         FSM = 1;
-        digitalWrite(dirPin, HIGH); // Up
-        vel = inhaleSpeed;
-        jog = HIGH;
-        long t2 = micros();
+        motor.setMaxSpeed(inhaleSpeed);
+        motor.moveTo(maxPosition);
+        maxPressure2 = 0.0;
+        hysterisis = LOW;
+        refreshLCD = LOW;
         break;
 
       case 1: // Inhalation Cycle
-        if ((millis() - contadorLecturapresion) > 50) {
-          contadorLecturapresion = millis();
-          readPressure();
+
+        if ((pressureRead > (setPressure)) && !hysterisis) {
+          //          motor.setMaxSpeed(0);
+          motor.stop();
+          hysterisis = HIGH;
         }
 
-        if ((setPressure < readPressure()) || (currentPulses >= maxPulses)) {
-          jog = LOW;
-          long dt = micros() - t2;
-          Serial.println(dt);
-        }
-
-        if ((millis() - contadorCiclo) >= int(inhaleTime * 1000)) { // Condition to change state
+        if (((millis() - contadorCiclo) >= int(inhaleTime * 1000)) || alarmaPresionAlta) { // Condition to change state
+          //          motor.setMaxSpeed(0);
+          motor.stop();
+          delay(2);
+          if ((motor.currentPosition() < 2000) && hysterisis)
+            alarmaBloqueo = HIGH;
+          else {
+            alarmaBloqueo = LOW;
+            alarmaBloqueoOld = LOW;
+          }
+          hysterisis = LOW;
+          motor.setMaxSpeed(exhaleSpeed);
           contadorCiclo = millis();
-          FSM = 2;
-          //          jog = HIGH;
-          vel = exhaleSpeed;
-          digitalWrite(dirPin, LOW);
+          delay(1);
+          FSM = 22;
         }
+        break;
 
+      case 22:
+        peepPressure = 99.0;
+        motor.setMaxSpeed(exhaleSpeed);
+        delay(1);
+        motor.move(minPosition);
+
+        //        Serial.print(motor.currentPosition());
+        //        Serial.print('\t');
+        //        Serial.println(motor.targetPosition());
+        contadorCiclo = millis();
+        FSM = 2;
         break;
 
       case 2: // Exhalation Cycle
-        if (!digitalRead(sensorPin))
-          jog = LOW;
+        //        if (digitalRead(sensorPin))
+        //          motor.moveTo(-1200);
 
-        currentPulses = 0;
+        if (!digitalRead(sensorPin)) {
+          motor.setMaxSpeed(0);
+          motor.stop();
+          motor.setCurrentPosition(0);
+          if (alarmaSensor) {
+            alarmaSensor = LOW;
+            alarmaSensorOld = LOW;
+          }
+
+          if (!checkSensor) {  // Flanco subida sensor regreso
+            // Si hay presion baja
+            if ((maxPressure2 - peepPressure) < pressMinLimit)
+              contadorAlarmaPresionBaja++;
+            else
+              contadorAlarmaPresionBaja = 0;
+
+            if (contadorAlarmaPresionBaja > 1)
+              alarmaPresionBaja = HIGH;
+            else {
+              alarmaPresionBaja = LOW;
+              alarmaPresionBajaOld = LOW;
+            }
+          }
+
+          checkSensor = HIGH;
+          refreshLCD = HIGH;
+        }
 
         if ((millis() - contadorCiclo) >= int(exhaleTime * 1000)) {
+          motor.setMaxSpeed(0);
+          motor.stop();
           FSM = 0;
+          checkSensor = LOW;
           contadorCiclo = millis();
+          numCiclos++;
+          updatenumCiclos++;
+          if ((pressureRead < pressMaxLimit) && (pressureRead < pressMaxMovil)) {
+            alarmaPresionAlta = LOW;
+            alarmaPresionAltaOld = LOW;
+          }
+          if (updatenumCiclos > 50) { // Solo actualizo la EEPROM cada 50 ciclos.
+            EEPROM.put(80, numCiclos);
+            updatenumCiclos = 0;
+          }
+          if (digitalRead(sensorPin)) {
+            alarmaSensor = HIGH;
+          }
+          if ((digitalRead(startButton)) || digitalRead(eStopPin))
+            startCycle = LOW;
+          //          refreshLCD = HIGH;
         }
         break;
 
       default:
         break;
     } // End cases
-  }
-
+  } // End machine cycle
 }  //End Loop
 
 void updateEncoder() {
@@ -491,6 +782,15 @@ void updateEncoder() {
     if (sum == 0b1101 || sum == 0b0100 || sum == 0b0010 || sum == 0b1011) encoderValue[contCursor - 1] ++;
     if (sum == 0b1110 || sum == 0b0111 || sum == 0b0001 || sum == 0b1000) encoderValue[contCursor - 1] --;
 
+    if (encoderValue[0] > 160)
+      encoderValue[0] = 160;
+
+    if (encoderValue[1] < 20.0)
+      encoderValue[1] = 20.0;
+
+    if (encoderValue[2] < 20.0)
+      encoderValue[2] = 20.0;
+
   }
 
   lastEncoded = encoded; //store this value for next time
@@ -498,26 +798,32 @@ void updateEncoder() {
 
 float readPressure() {
   adc0 = ads.readADC_SingleEnded(0);
-  return (((adc0 - 14125.0) * 5.0478) / 1000);
+  //    return ((71.38 * (adc0 - offsetPresion) / offsetPresion));
+  return ((71.38 * (adc0 - offsetPresion) / offsetPresion) * 1.197 + 0.38);
 }
-
-//void stepp(int stepDelay) {
-//  PORTC |= B00000001; // Pin A0 (PC0) to HIGH
-//  delayMicroseconds(stepDelay);
-//  PORTC &= B11111110; // Pin D2 to LOW
-//  delayMicroseconds(stepDelay);
-//}
 
 ISR(TIMER1_COMPA_vect) {
-  if (jog) {
-    frecTimer++;
-    if (frecTimer > 100 / (vel)) {
-      digitalWrite(pulsePin, !digitalRead(pulsePin));
-      frecTimer = 0;
-      currentPulses++;
-    }
-  }
+  motor.run();  // Motor keepalive (at least once per step).
 }
 
+void cargarLCD () {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print(F("PIP "));
+  lcd.setCursor(12, 0);
+  lcd.print(F("P IN"));
+  lcd.setCursor(0, 1);
+  lcd.print(F("PEEP "));
+  lcd.setCursor(12, 1);
+  lcd.print(F("tIN "));
+  lcd.setCursor(12, 2);
+  lcd.print(F("tEX "));
+  lcd.setCursor(0, 2);
+  lcd.print(F("I:E  1:"));
+  lcd.setCursor(0, 3);
+  lcd.print(F("BPM "));
+  lcd.setCursor(12, 3);
+  lcd.print(F("# "));
+}
 
 /*******************************************************/
