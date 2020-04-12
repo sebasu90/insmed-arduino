@@ -348,44 +348,51 @@ void loop()
   //  Serial.println(millis() - t1);
   //  t1 = millis();
 
-  //  if (digitalRead(batteryPin)) {
-  //    delay(3);
-  //    if (digitalRead(batteryPin)) {
-  //      delay(3);
-  //      if (digitalRead(batteryPin)) {
-  //        alarmaBateria = HIGH;
-  //        digitalWrite(alarmPin, HIGH);
-  //      }
-  //    }
-  //  }
+  // if (digitalRead(batteryPin))
+  // {
+  //   delay(3);
+  //   if (digitalRead(batteryPin))
+  //   {
+  //     delay(3);
+  //     if (digitalRead(batteryPin))
+  //     {
+  //       alarmaBateria = HIGH;
+  //       digitalWrite(alarmPin, HIGH);
+  //     }
+  //   }
+  // }
 
-  //  else {
-  //    alarmaBateria = LOW;
-  //    alarmaBateriaOld = LOW;
-  //  }
+  // else
+  // {
+  //   alarmaBateria = LOW;
+  //   alarmaBateriaOld = LOW;
+  // }
 
-  //  if (digitalRead(eStopPin)) {
-  //    alarmaeStop = HIGH;
-  //  }
-  //  else {
-  //    alarmaeStop = LOW;
-  //    alarmaeStopOld = LOW;
-  //  }
+  // if (digitalRead(eStopPin))
+  // {
+  //   alarmaeStop = HIGH;
+  // }
+  // else
+  // {
+  //   alarmaeStop = LOW;
+  //   alarmaeStopOld = LOW;
+  // }
 
   if (((alarmaSensor || alarmaPresionAlta || alarmaPresionBaja || alarmaAmbu || alarmaSensor2 || alarmaBloqueo) && startCycle) || alarmaeStop)
   {
     alarmas = HIGH;
   }
 
-  //  if (alarmas || alarmaBateria)
-  //    digitalWrite(alarmPin, HIGH);
-  //  else
-  //    digitalWrite(alarmPin, LOW);
+  // if (alarmas || alarmaBateria)
+  //   digitalWrite(alarmPin, HIGH);
+  // else
+  //   digitalWrite(alarmPin, LOW);
 
-  //  if (alarmaeStop && !alarmaeStopOld) {
-  //    alarmaeStopOld = HIGH;
-  //    newAlarm = HIGH;
-  //  }
+  // if (alarmaeStop && !alarmaeStopOld)
+  // {
+  //   alarmaeStopOld = HIGH;
+  //   newAlarm = HIGH;
+  // }
 
   if (alarmaSensor && !alarmaSensorOld)
   {
