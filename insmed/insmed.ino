@@ -615,9 +615,10 @@ void loop()
   t3 = millis();
 
   if ((!digitalRead(startButton)) || startCycle)
-  {
+  { // Start
     startCycle = HIGH;
-    digitalWrite(enPin, LOW);      // Enable motor
+    digitalWrite(enPin, LOW); // Enable motor
+
     pressureRead = readPressure(); // Once per cycle
 
     if (pressureRead < 1.0)
