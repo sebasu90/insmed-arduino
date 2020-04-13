@@ -190,6 +190,21 @@ boolean isButtonPushDown(void)
   return false;
 }
 
+int readPresControlValue()
+{
+  return readEncoderValue(1);
+};
+
+int readIeRatioValue()
+{
+  return readEncoderValue(3) / 10.0;
+};
+
+int readBpmValue()
+{
+  return readEncoderValue(2);
+};
+
 /*
   Variables:
 
@@ -299,15 +314,17 @@ public:
 
       if (inChar == SEND_ALL_PARAMETERS_CHAR)
       {
-        int presControlExternal = readEncoderValue(1);
-        int bpmExternal = readEncoderValue(2);
-        int ieRatioExternal = readEncoderValue(3) / 10.0;
 
-        Serial1.println(
-            's' +
-            presControlExternal + ',' +
-            bpmExternal + ',' +
-            ieRatioExternal);
+        String res = "s";
+        res += readPresControlValue();
+        res += ",";
+        res += readBpmValue();
+        res += ",";
+        res += ((int)(readIeRatioValue() * 10.0));
+        res += ";";
+
+        Serial1.println(res);
+        Serial.println(res);
       }
 
       if (inChar == PRES_CONTROL_CHAR || inChar == IE_RATIO_CHAR)
@@ -1102,8 +1119,8 @@ void refreshLCDvalues()
     break;
 
   case 4:
-    ieRatio = readEncoderValue(3) / 10.0;
-    bpm = readEncoderValue(2);
+    ieRatio = readIeRatioValue();
+    bpm = readBpmValue();
     if (ieRatioOld == ieRatio && bpmOld == bpm)
       lcdIndex = 9;
     else
@@ -1153,7 +1170,7 @@ void refreshLCDvalues()
     break;
 
   case 9:
-    presControl = readEncoderValue(1);
+    presControl = readPresControlValue();
     if (presControlOld == presControl)
       lcdIndex = 11;
     else
