@@ -229,8 +229,8 @@ const char HAND_SHAKE_CHAR = 'h';
 const char SEND_ALL_PARAMETERS_CHAR = 's';
 
 const char PRES_CONTROL_CHAR = 'p';
+const char BPM_CHAR = 'b';
 const char IE_RATIO_CHAR = 'i';
-const char BPM_CHAR = 'i';
 
 class BTSerial
 {
@@ -314,13 +314,15 @@ public:
 
       if (inChar == SEND_ALL_PARAMETERS_CHAR)
       {
-
-        String res = "s";
+        String res = "s" + PRES_CONTROL_CHAR;
         res += readPresControlValue();
-        res += ",";
+
+        res += "s" + BPM_CHAR;
         res += readBpmValue();
-        res += ",";
+
+        res += "s" + IE_RATIO_CHAR;
         res += ((int)(readIeRatioValue() * 10.0));
+
         res += ";";
 
         Serial1.println(res);
