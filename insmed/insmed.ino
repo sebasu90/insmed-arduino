@@ -190,10 +190,69 @@ boolean isButtonPushDown(void)
   return false;
 }
 
+const char HAND_SHAKE_CHAR = 'h';
+const char PRES_CONTROL_CHAR = 'p';
+const char IE_RATIO_CHAR = 'i';
+const char BPM_CHAR = 'i';
+
+/*
+  Variables:
+
+  presControl
+  ieRatio
+  bpm
+
+  Alarmas:
+
+  alarmaSensor
+  alarmaPresionAlta
+  alarmaPresionBaja
+  alarmaAmbu
+  alarmaBloqueo
+  alarmaeStop
+  alarmaBateria
+
+  btSerial.alarm("alarmaSensor");
+  */
+
 class BTSerial
 {
   bool handShaked = LOW;
   unsigned long beatTimer = 0;
+
+  int _presControl = 0;
+  bool _presControlAvailable = LOW;
+
+  int _ieRatio = 0;
+  bool _ieRatioAvailable = LOW;
+
+  char readingChar = ' ';
+  String inputString = "";
+
+  void parseIntoVar()
+  {
+    switch (readingChar)
+    {
+    case PRES_CONTROL_CHAR:
+      _presControlAvailable = HIGH;
+      _presControl = inputString.toInt();
+      _presControl = min(_presControl, 100);
+      readingChar = ' ';
+      inputString = "";
+      break;
+
+    case IE_RATIO_CHAR:
+      _ieRatioAvailable = HIGH;
+      _ieRatio = inputString.toInt();
+      _presControl = min(_presControl, 1000);
+      readingChar = ' ';
+      inputString = "";
+      break;
+
+    default:
+      break;
+    }
+  }
 
 public:
   void setup()
@@ -208,12 +267,12 @@ public:
   {
     if (handShaked && (millis() - beatTimer) > 10 * 1000)
     {
+      handShaked = LOW;
       Serial1.println("AT+RESTART");
+
       Serial.println("");
       Serial.println("BLE restarted");
       Serial.println("");
-
-      handShaked = LOW;
     }
 
     if (Serial1.available())
@@ -221,7 +280,7 @@ public:
       char inChar = Serial1.read();
       Serial.write(inChar);
 
-      if (inChar == 'h')
+      if (inChar == HAND_SHAKE_CHAR)
       {
         handShaked = HIGH;
         beatTimer = millis();
@@ -229,18 +288,19 @@ public:
         Serial.println("handshaked");
       }
 
-      // if (inChar == 'a')
-      //   startBT = HIGH;
-
-      // if (startBT && inChar != 'a' && inChar != 'h' && inChar != 'b' && inChar != 'c' && inChar != ';')
-      //   inputString += inChar;
-
-      // if (inChar == ';')
-      // {
-      //   amp = inputString.toInt();
-      //   inputString = "";
-      //   startBT = LOW;
-      // }
+      if (inChar == PRES_CONTROL_CHAR || inChar == IE_RATIO_CHAR)
+      {
+        parseIntoVar();
+        readingChar = inChar;
+      }
+      else if (readingChar != ' ' && isDigit(inChar))
+      {
+        inputString += inChar;
+      }
+      else if (inChar == ';')
+      {
+        parseIntoVar();
+      }
     }
   }
 
@@ -249,8 +309,28 @@ public:
     if (handShaked)
     {
       Serial1.print(in);
-      Serial.print(in);
+      // Serial.print(in);
     }
+  }
+
+  bool presControlAvailable()
+  {
+    return _presControlAvailable;
+  }
+  int presControl()
+  {
+    _presControlAvailable = LOW;
+    return _presControl;
+  }
+
+  bool ieRatioAvailable()
+  {
+    return _ieRatioAvailable;
+  }
+  int ieRatio()
+  {
+    _ieRatioAvailable = LOW;
+    return _ieRatio;
   }
 };
 
@@ -869,6 +949,21 @@ void loop()
   //  Serial.println(dt3);
 
   btSerial.loop();
+
+  if (btSerial.presControlAvailable())
+  {
+    Serial.println("");
+    Serial.print("presControl ");
+    Serial.println(btSerial.presControl());
+  }
+
+  if (btSerial.ieRatioAvailable())
+  {
+    Serial.println("");
+    Serial.print("ieRatio ");
+    Serial.println(btSerial.ieRatio());
+  }
+
 } //End Loop
 
 void updateEncoder()
