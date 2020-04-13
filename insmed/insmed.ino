@@ -190,11 +190,6 @@ boolean isButtonPushDown(void)
   return false;
 }
 
-const char HAND_SHAKE_CHAR = 'h';
-const char PRES_CONTROL_CHAR = 'p';
-const char IE_RATIO_CHAR = 'i';
-const char BPM_CHAR = 'i';
-
 /*
   Variables:
 
@@ -214,6 +209,13 @@ const char BPM_CHAR = 'i';
 
   btSerial.alarm("alarmaSensor");
   */
+
+const char HAND_SHAKE_CHAR = 'h';
+const char SEND_ALL_PARAMETERS_CHAR = 's';
+
+const char PRES_CONTROL_CHAR = 'p';
+const char IE_RATIO_CHAR = 'i';
+const char BPM_CHAR = 'i';
 
 class BTSerial
 {
@@ -265,6 +267,13 @@ public:
 
   void loop()
   {
+
+    if ((millis() - beatTimer) > 10 * 1000)
+    {
+      Serial.println(
+          readEncoderValue(1));
+    }
+
     if (handShaked && (millis() - beatTimer) > 10 * 1000)
     {
       handShaked = LOW;
@@ -286,6 +295,19 @@ public:
         beatTimer = millis();
 
         Serial.println("handshaked");
+      }
+
+      if (inChar == SEND_ALL_PARAMETERS_CHAR)
+      {
+        int presControlExternal = readEncoderValue(1);
+        int bpmExternal = readEncoderValue(2);
+        int ieRatioExternal = readEncoderValue(3) / 10.0;
+
+        Serial1.println(
+            's' +
+            presControlExternal + ',' +
+            bpmExternal + ',' +
+            ieRatioExternal);
       }
 
       if (inChar == PRES_CONTROL_CHAR || inChar == IE_RATIO_CHAR)
