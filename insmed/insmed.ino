@@ -314,13 +314,16 @@ public:
 
       if (inChar == SEND_ALL_PARAMETERS_CHAR)
       {
-        String res = "s" + PRES_CONTROL_CHAR;
+        String res = "s";
+        res += PRES_CONTROL_CHAR;
         res += readPresControlValue();
 
-        res += "s" + BPM_CHAR;
+        res += ";s";
+        res += BPM_CHAR;
         res += readBpmValue();
 
-        res += "s" + IE_RATIO_CHAR;
+        res += ";s";
+        res += IE_RATIO_CHAR;
         res += ((int)(readIeRatioValue() * 10.0));
 
         res += ";";
