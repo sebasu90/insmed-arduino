@@ -30,6 +30,7 @@ Adafruit_ADS1115 ads(0x48);
 
 bool goHome = LOW;
 
+bool setAlarmas = LOW;
 bool alarmaSensor = LOW;
 bool alarmaSensor2 = LOW;
 bool alarmaPresionAlta = LOW;
@@ -37,6 +38,7 @@ bool alarmaPresionBaja = LOW;
 bool alarmaAmbu = LOW;
 bool alarmaBloqueo = LOW;
 bool alarmaBateria = LOW;
+bool buzzer = LOW;
 
 bool alarmas = LOW;
 bool oldAlarmas = LOW; // Rising edge to clear screen
@@ -355,7 +357,6 @@ void loop()
       if (digitalRead(batteryPin))
       {
         alarmaBateria = HIGH;
-        digitalWrite(alarmPin, HIGH);
       }
     }
   }
@@ -376,15 +377,12 @@ void loop()
     alarmaeStopOld = LOW;
   }
 
-  if (((alarmaSensor || alarmaPresionAlta || alarmaPresionBaja || alarmaAmbu || alarmaSensor2 || alarmaBloqueo) && startCycle) || alarmaeStop)
+  if (((alarmaSensor || alarmaPresionAlta || alarmaPresionBaja || alarmaAmbu || alarmaSensor2 || alarmaBloqueo) && startCycle) || alarmaeStop || alarmaBateria)
   {
     alarmas = HIGH;
   }
 
-  if (alarmas || alarmaBateria)
-    digitalWrite(alarmPin, HIGH);
-  else
-    digitalWrite(alarmPin, LOW);
+  digitalWrite(alarmPin, buzzer);
 
   if (alarmaeStop && !alarmaeStopOld)
   {
@@ -433,8 +431,13 @@ void loop()
   //    newAlarm = HIGH;
   //  }
 
+  if (newAlarm)
+  {
+    setAlarmas = HIGH;
+    buzzer = HIGH;
+  }
+
   // Refrescar LCD // Solo se hace en Stop o al fin del ciclo
-  t2 = millis();
 
   if ((millis() - contadorLCD) > lcdTimer)
   { // Refresh LCD
@@ -442,7 +445,7 @@ void loop()
     refreshLCD = HIGH;
   }
   //if ((((FSM == 2) && ((refreshLCD && !alarmas) || newAlarm)) || (!startCycle && (!alarmas || newAlarm))) && refreshLCD) {
-  if ((!alarmas || newAlarm) && refreshLCD)
+  if ((!setAlarmas || newAlarm) && refreshLCD)
   {
     if (newAlarm)
     {
@@ -541,15 +544,13 @@ void loop()
     } // If no Alarmas
   }   // If refreshLCD
 
-  dt2 = millis() - t2;
-
   if (!isButtonPushDown())
   { // Anti-Bounce Button Switch
     contadorBoton = millis();
     contadorBoton2 = millis();
   }
 
-  if (((millis() - contadorBoton2) > changeScreenTimer) && alarmas)
+  if (((millis() - contadorBoton2) > changeScreenTimer) && setAlarmas)
   {
     contadorBoton2 = millis();
 
@@ -559,7 +560,7 @@ void loop()
       alarmaAmbuOld = LOW;
     }
 
-    alarmas = LOW;
+    setAlarmas = LOW;
     oldAlarmas = LOW;
     numAlarmas = 0;
     numCol = 0;
@@ -577,47 +578,51 @@ void loop()
     EEPROM.put(80, numCiclos);
   }
 
-  if (((millis() - contadorBoton) > buttonTimer) && (!alarmas || alarmaBateria))
+  if (((millis() - contadorBoton) > buttonTimer))
   {
-    contadorBoton = millis();
-    if (contCursor == 0)
+    if (buzzer)
+      buzzer = LOW;
+    else
     {
-      lcd.blink();
-      contCursor = 1;
-    }
+      contadorBoton = millis();
+      if (contCursor == 0)
+      {
+        lcd.blink();
+        contCursor = 1;
+      }
 
-    else if (contCursor == 1)
-    {
-      EEPROM.put(contCursor * 10, encoderValue[contCursor - 1]);
-      contCursor = 2;
-    }
+      else if (contCursor == 1)
+      {
+        EEPROM.put(contCursor * 10, encoderValue[contCursor - 1]);
+        contCursor = 2;
+      }
 
-    else if (contCursor == 2)
-    {
-      EEPROM.put(contCursor * 10, encoderValue[contCursor - 1]);
-      contCursor = 3;
-    }
+      else if (contCursor == 2)
+      {
+        EEPROM.put(contCursor * 10, encoderValue[contCursor - 1]);
+        contCursor = 3;
+      }
 
-    else if (contCursor == 3)
-    {
-      EEPROM.put(contCursor * 10, encoderValue[contCursor - 1]);
-      lcd.noBlink();
-      contCursor = 0;
-    }
+      else if (contCursor == 3)
+      {
+        EEPROM.put(contCursor * 10, encoderValue[contCursor - 1]);
+        lcd.noBlink();
+        contCursor = 0;
+      }
 
-    else if (contCursor > 3)
-    {
-      contCursor = 0;
-      lcd.noBlink();
-    }
-  } // End If Button Switch
+      else if (contCursor > 3)
+      {
+        contCursor = 0;
+        lcd.noBlink();
+      }
+    } // End Else no Buzzer
+  }   // End If Button Switch
 
   if (!startCycle || digitalRead(eStopPin))
   {
     digitalWrite(enPin, HIGH); // disable motor
   }
 
-  t3 = millis();
   if (((!digitalRead(startButton) && !digitalRead(eStopPin)) || startCycle))
   { // Start
     startCycle = HIGH;
@@ -775,13 +780,6 @@ void loop()
       break;
     } // End cases
   }   // End machine cycle
-  dt3 = millis() - t3;
-
-  //  Serial.print(dt1);
-  //  Serial.print('\t');
-  //  Serial.print(dt2);
-  //  Serial.print('\t');
-  //  Serial.println(dt3);
 } //End Loop
 
 void updateEncoder()
