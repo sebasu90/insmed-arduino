@@ -509,7 +509,7 @@ void loop()
     outputString = 't';
     outputString += millis();
     outputString += 'p';
-    outputString += maxPressure;
+    outputString += pressureRead;
     outputString += ';';
 
     btSerial.print(outputString);
