@@ -282,13 +282,6 @@ public:
 
   void loop()
   {
-
-    if ((millis() - beatTimer) > 10 * 1000)
-    {
-      Serial.println(
-          readEncoderValue(1));
-    }
-
     if (handShaked && (millis() - beatTimer) > 10 * 1000)
     {
       handShaked = LOW;
