@@ -18,7 +18,6 @@ Adafruit_ADS1115 ads(0x48);
 #define buttonPin 10
 
 #define batteryPin 9
-#define eStopPin 10
 #define sensorPin A1   // Inductive sensor to control motor range
 #define startButton A0 // Start switch
 
@@ -122,7 +121,7 @@ long dt3;
 byte index = 0;
 byte FSM;
 
-int maxPosition = 3400;
+int maxPosition = 2500;
 int inhaleSpeed = 3000;
 int exhaleSpeed = 3200;
 
@@ -369,15 +368,15 @@ void loop()
     alarmaBateriaOld = LOW;
   }
 
-  if (digitalRead(eStopPin))
-  {
-    alarmaeStop = HIGH;
-  }
-  else
-  {
-    alarmaeStop = LOW;
-    alarmaeStopOld = LOW;
-  }
+//  if (digitalRead(eStopPin))
+//  {
+//    alarmaeStop = HIGH;
+//  }
+//  else
+//  {
+//    alarmaeStop = LOW;
+//    alarmaeStopOld = LOW;
+//  }
 
   if (((alarmaSensor || alarmaPresionAlta || alarmaPresionBaja || alarmaAmbu || alarmaSensor2 || alarmaBloqueo) && startCycle) || alarmaeStop || alarmaBateria)
   {
@@ -625,7 +624,7 @@ void loop()
     digitalWrite(enPin, HIGH); // disable motor
   }
 
-  if (((!digitalRead(startButton) && !digitalRead(eStopPin)) || startCycle))
+  if (!digitalRead(startButton) || startCycle)
   { // Start
     startCycle = HIGH;
     digitalWrite(enPin, LOW); // Enable motor
