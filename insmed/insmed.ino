@@ -17,8 +17,8 @@ Adafruit_ADS1115 ads(0x48);
 #define encoderPinB 11
 #define buttonPin 10
 
-//#define batteryPin 9
-//#define eStopPin 10
+#define batteryPin 9
+#define eStopPin 10
 #define sensorPin A1   // Inductive sensor to control motor range
 #define startButton A0 // Start switch
 
