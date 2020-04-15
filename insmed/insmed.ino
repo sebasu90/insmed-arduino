@@ -127,7 +127,7 @@ byte index = 0;
 byte FSM;
 
 int maxPosition = 2500;
-int inhaleSpeed = 3000;
+int inhaleSpeed = 2800;
 int exhaleSpeed = 3200;
 
 signed int minPosition = -4400;
@@ -453,7 +453,7 @@ void setup() //Las instrucciones solo se ejecutan una vez, despues del arranque
   //  lowSpeed = readEncoderValue(7);
 
   motor.setAcceleration(20000.0); // To test
-  motor.setMinPulseWidth(35);
+  motor.setMinPulseWidth(25);
 
   lcd.setCursor(0, 0);
   lcd.print(F(" CALIBRACION SENSOR"));
