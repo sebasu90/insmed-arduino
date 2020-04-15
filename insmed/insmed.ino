@@ -529,14 +529,14 @@ void loop()
     //    Serial.print("\t");
     //    Serial.println(alarmaBloqueo);
 
-    //    Serial.print(setPressure * 1.1);
-    //    Serial.print("\t");
-    //    Serial.print(setPressure * 0.9);
-    //    Serial.print("\t");
-    //    Serial.print(maxPressure);
-    //    maxPressure = 0.0;
-    //    Serial.print("\t");
-    //    Serial.println(setPressure);
+    Serial.print(setPressure * 1.1);
+    Serial.print("\t");
+    Serial.print(setPressure * 0.9);
+    Serial.print("\t");
+    Serial.print(maxPressure);
+    maxPressure = 0.0;
+    Serial.print("\t");
+    Serial.println(setPressure);
 
     contadorLectura = millis();
 
@@ -854,7 +854,7 @@ void loop()
     if (pressureRead > maxPressure)
       maxPressure = pressureRead;
 
-    if ((pressureRead < peepPressure) && pressureRead > -70.0)
+    if ((pressureRead < peepPressure) && pressureRead > -70.0 && ((millis() - contadorCiclo) < 1000) && FSM == 2)
       peepPressure = pressureRead;
 
     if (FSM != 2)
