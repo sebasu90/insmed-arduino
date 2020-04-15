@@ -521,13 +521,13 @@ void loop()
 
     // Prueba motor
 
-    Serial.print(alarmaSensor);
-    Serial.print("\t");
-    Serial.print(alarmaPresionAlta);
-    Serial.print("\t");
-    Serial.print(alarmaPresionBaja);
-    Serial.print("\t");
-    Serial.println(alarmaBloqueo);
+    //    Serial.print(alarmaSensor);
+    //    Serial.print("\t");
+    //    Serial.print(alarmaPresionAlta);
+    //    Serial.print("\t");
+    //    Serial.print(alarmaPresionBaja);
+    //    Serial.print("\t");
+    //    Serial.println(alarmaBloqueo);
 
     //    Serial.print(setPressure * 1.1);
     //    Serial.print("\t");
@@ -953,7 +953,6 @@ void loop()
               alarmaPresionBajaOld = LOW;
             }
           }
-
           checkSensor = HIGH;
         }
 
@@ -1024,10 +1023,12 @@ void updateEncoder()
   int encoded = (MSB << 1) | LSB;         //converting the 2 pin value to single number
   int sum = (lastEncoded << 2) | encoded; //adding it to the previous encoded value
 
+  Serial.println(sum);
+
   if (contCursor > 0)
   {
 
-    if (sum == 5 || sum == 6 || sum == 7 || sum == 9 || sum == 13)
+    if (sum == 5 || sum == 6 ||  sum == 9)
       encoderValue[contCursor - 1]++;
     if (sum == 3 || sum == 12 || sum == 8)
 
