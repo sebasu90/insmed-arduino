@@ -50,7 +50,7 @@ byte numCol = 0;
 
 bool newAlarm = LOW;
 
-bool psvMode = HIGH;
+bool psvMode = LOW;
 
 bool alarmaSensorOld = LOW;
 bool alarmaPresionAltaOld = LOW;
@@ -445,36 +445,10 @@ void setup() //Las instrucciones solo se ejecutan una vez, despues del arranque
   EEPROM.get(70, encoderValue[6]);
   EEPROM.get(80, numCiclos);
 
-  //  setPressure = readEncoderValue(1) / 10.0;
-  //  ieRatio = readEncoderValue(2) / 10.0;
-  //  bpm = readEncoderValue(3);
-
-  //  maxPulses = readEncoderValue(4);
-  //  inhaleSpeed = readEncoderValue(5);
-  //  exhaleSpeed = readEncoderValue(6);
-  //  lowSpeed = readEncoderValue(7);
-
   motor.setAcceleration(20000.0); // To test
   motor.setMinPulseWidth(25);
 
-  lcd.setCursor(0, 0);
-  lcd.print(F(" CALIBRACION SENSOR"));
-  lcd.setCursor(0, 2);
-  lcd.print(F("  ASEGURE PRESION"));
-  lcd.setCursor(0, 3);
-  lcd.print(F("     AMBIENTE"));
-  delay(2000);
-
-  offsetPresion = ads.readADC_SingleEnded(0);
-
-  lcd.clear();
-
-  lcd.setCursor(0, 1);
-  lcd.print(F("    CALIBRACION"));
-  lcd.setCursor(0, 2);
-  lcd.print(F("     TERMINADA"));
-
-  delay(1000);
+  offsetPresion = ads.readADC_SingleEnded(1);
 
   cargarLCD();
   contCursor2 = 2;
@@ -861,7 +835,7 @@ void loop()
 
     if (FSM != 2)
     {
-      setPressure = presControl;
+      setPressure = presControl+peepPressure;
       pressMinMovil = setPressure * 0.8;
       pressMaxMovil = setPressure * 1.2;
     }
