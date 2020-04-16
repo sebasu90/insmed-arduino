@@ -27,7 +27,7 @@ Adafruit_ADS1115 ads(0x48);
 #define enPin A4
 //#define alarmPin 5
 
-#define buzzerPin 5
+#define buzzerPin 9
 #define ledAlarm 13
 
 bool goHome = LOW;
@@ -229,12 +229,14 @@ int readBpmValue()
   btSerial.alarm("alarmaSensor");
 */
 
-const char HAND_SHAKE_CHAR = 'h';
-const char SEND_ALL_PARAMETERS_CHAR = 's';
+#define HAND_SHAKE_CHAR 'h'
+#define SEND_ALL_PARAMETERS_CHAR 's'
 
-const char PRES_CONTROL_CHAR = 'p';
-const char BPM_CHAR = 'b';
-const char IE_RATIO_CHAR = 'i';
+#define PRES_CONTROL_CHAR 'p'
+#define BPM_CHAR 'b'
+#define IE_RATIO_CHAR 'i'
+
+#define debugSerial 0
 
 class BTSerial
 {
@@ -291,22 +293,26 @@ class BTSerial
         handShaked = LOW;
         Serial1.println("AT+RESTART");
 
-        Serial.println("");
-        Serial.println("BLE restarted");
-        Serial.println("");
+        if (debugSerial) {
+          Serial.println("");
+          Serial.println("BLE restarted");
+          Serial.println("");
+        }
       }
 
       if (Serial1.available())
       {
         char inChar = Serial1.read();
-        Serial.write(inChar);
+        if (debugSerial)
+          Serial.write(inChar);
 
         if (inChar == HAND_SHAKE_CHAR)
         {
           handShaked = HIGH;
           beatTimer = millis();
 
-          Serial.println("handshaked");
+          if (debugSerial)
+            Serial.println("handshaked");
         }
 
         if (inChar == SEND_ALL_PARAMETERS_CHAR)
@@ -326,7 +332,8 @@ class BTSerial
           res += ";";
 
           Serial1.println(res);
-          Serial.println(res);
+          if (debugSerial)
+            Serial.println(res);
         }
 
         if (inChar == PRES_CONTROL_CHAR || inChar == IE_RATIO_CHAR)
@@ -491,6 +498,10 @@ void loop()
     outputString += ';';
 
     btSerial.print(outputString);
+
+    if (btSerial.presControlAvailable()){
+      
+      }
 
     // Serial1.print(outputString);
     // Serial.print(outputString);
@@ -809,6 +820,7 @@ void loop()
     digitalWrite(enPin, HIGH); // disable motor
   }
 
+
   if (!digitalRead(startButton) || startCycle)
   { // Start
     startCycle = HIGH;
@@ -835,7 +847,7 @@ void loop()
 
     if (FSM != 2)
     {
-      setPressure = presControl+peepPressure;
+      setPressure = presControl + peepPressure;
       pressMinMovil = setPressure * 0.8;
       pressMaxMovil = setPressure * 1.2;
     }
