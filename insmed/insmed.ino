@@ -50,6 +50,8 @@ byte numCol = 0;
 
 bool newAlarm = LOW;
 
+bool psvMode = HIGH;
+
 bool alarmaSensorOld = LOW;
 bool alarmaPresionAltaOld = LOW;
 bool alarmaPresionBajaOld = LOW;
@@ -840,8 +842,8 @@ void loop()
 
     pressureRead = readPressure(); // Once per cycle
 
-    if (pressureRead < 1.0)
-      pressureRead = 0.0;
+    if (pressureRead < -70.0)
+      pressureRead = -70.0;
 
     if (numCiclos > maxnumCiclos)
       alarmaAmbu = HIGH;
@@ -859,7 +861,7 @@ void loop()
 
     if (FSM != 2)
     {
-      setPressure = presControl + peepPressure;
+      setPressure = presControl;
       pressMinMovil = setPressure * 0.8;
       pressMaxMovil = setPressure * 1.2;
     }
@@ -867,127 +869,259 @@ void loop()
     if ((pressureRead > pressMaxLimit) || (pressureRead > pressMaxMovil))
       alarmaPresionAlta = HIGH;
 
-    switch (FSM)
-    {
-      case 0:
-        contadorCiclo = millis();
-        FSM = 1;
-        motor.setMaxSpeed(inhaleSpeed);
-        motor.moveTo(maxPosition);
-        maxPressure2 = 0.0;
-        hysterisis = LOW;
-        refreshLCD = LOW;
-        break;
+    if (!psvMode) {
 
-      case 1: // Inhalation Cycle
-
-        if ((pressureRead > (setPressure)) && !hysterisis)
-        {
-          //          motor.setMaxSpeed(0);
-          motor.stop();
-          hysterisis = HIGH;
-        }
-
-        if (((millis() - contadorCiclo) >= int(inhaleTime * 1000)) || alarmaPresionAlta)
-        { // Condition to change state
-          //          motor.setMaxSpeed(0);
-          motor.stop();
-          delay(2);
-          if ((motor.currentPosition() < 2000) && hysterisis)
-            alarmaBloqueo = HIGH;
-          else
-          {
-            alarmaBloqueo = LOW;
-            alarmaBloqueoOld = LOW;
-          }
-          hysterisis = LOW;
-          motor.setMaxSpeed(exhaleSpeed);
+      switch (FSM)
+      {
+        case 0:
           contadorCiclo = millis();
-          //          delay(1);
-          FSM = 22;
-        }
-        break;
+          FSM = 1;
+          motor.setMaxSpeed(inhaleSpeed);
+          motor.moveTo(maxPosition);
+          maxPressure2 = 0.0;
+          hysterisis = LOW;
+          break;
 
-      case 22:
-        maxPressureLCD = maxPressure2;
-        peepPressure = 99.0;
-        motor.setMaxSpeed(exhaleSpeed);
-        //        delay(1);
-        motor.move(minPosition);
+        case 1: // Inhalation Cycle
 
-        //        Serial.print(motor.currentPosition());
-        //        Serial.print('\t');
-        //        Serial.println(motor.targetPosition());
-        contadorCiclo = millis();
-        FSM = 2;
-        break;
-
-      case 2: // Exhalation Cycle
-        //        if (digitalRead(sensorPin))
-        //          motor.moveTo(-1200);
-
-        if (!digitalRead(sensorPin))
-        {
-          motor.setMaxSpeed(0);
-          motor.stop();
-          motor.setCurrentPosition(0);
-          if (alarmaSensor)
+          if ((pressureRead > (setPressure)) && !hysterisis)
           {
-            alarmaSensor = LOW;
-            alarmaSensorOld = LOW;
+            //          motor.setMaxSpeed(0);
+            motor.stop();
+            hysterisis = HIGH;
           }
 
-          if (!checkSensor)
-          { // Flanco subida sensor regreso
-            // Si hay presion baja
-            if ((maxPressure2 - peepPressure) < pressMinLimit)
-              contadorAlarmaPresionBaja++;
-            else
-              contadorAlarmaPresionBaja = 0;
-
-            if (contadorAlarmaPresionBaja > 1)
-              alarmaPresionBaja = HIGH;
+          if (((millis() - contadorCiclo) >= int(inhaleTime * 1000)) || alarmaPresionAlta)
+          { // Condition to change state
+            //          motor.setMaxSpeed(0);
+            motor.stop();
+            delay(2);
+            if ((motor.currentPosition() < 2000) && hysterisis)
+              alarmaBloqueo = HIGH;
             else
             {
-              alarmaPresionBaja = LOW;
-              alarmaPresionBajaOld = LOW;
+              alarmaBloqueo = LOW;
+              alarmaBloqueoOld = LOW;
             }
+            hysterisis = LOW;
+            motor.setMaxSpeed(exhaleSpeed);
+            contadorCiclo = millis();
+            //          delay(1);
+            FSM = 22;
           }
-          checkSensor = HIGH;
-        }
+          break;
 
-        if ((millis() - contadorCiclo) >= int(exhaleTime * 1000))
-        {
-          motor.setMaxSpeed(0);
-          motor.stop();
-          FSM = 0;
-          checkSensor = LOW;
+        case 22:
+          maxPressureLCD = maxPressure2;
+          peepPressure = 99.0;
+          motor.setMaxSpeed(exhaleSpeed);
+          //        delay(1);
+          motor.move(minPosition);
+
+          //        Serial.print(motor.currentPosition());
+          //        Serial.print('\t');
+          //        Serial.println(motor.targetPosition());
           contadorCiclo = millis();
-          numCiclos++;
-          updatenumCiclos++;
-          peepPressureLCD = peepPressure;
-          if ((pressureRead < pressMaxLimit) && (pressureRead < pressMaxMovil))
-          {
-            alarmaPresionAlta = LOW;
-            alarmaPresionAltaOld = LOW;
-          }
-          if (updatenumCiclos > 50)
-          { // Solo actualizo la EEPROM cada 50 ciclos.
-            EEPROM.put(80, numCiclos);
-            updatenumCiclos = 0;
-          }
-          if (digitalRead(sensorPin))
-          {
-            alarmaSensor = HIGH;
-          }
-          if ((digitalRead(startButton)))
-            startCycle = LOW;
-        }
-        break;
+          FSM = 2;
+          break;
 
-      default:
-        break;
-    } // End cases
+        case 2: // Exhalation Cycle
+          //        if (digitalRead(sensorPin))
+          //          motor.moveTo(-1200);
+
+          if (!digitalRead(sensorPin))
+          {
+            motor.setMaxSpeed(0);
+            motor.stop();
+            motor.setCurrentPosition(0);
+            if (alarmaSensor)
+            {
+              alarmaSensor = LOW;
+              alarmaSensorOld = LOW;
+            }
+
+            if (!checkSensor)
+            { // Flanco subida sensor regreso
+              // Si hay presion baja
+              if ((maxPressure2 - peepPressure) < pressMinLimit)
+                contadorAlarmaPresionBaja++;
+              else
+                contadorAlarmaPresionBaja = 0;
+
+              if (contadorAlarmaPresionBaja > 1)
+                alarmaPresionBaja = HIGH;
+              else
+              {
+                alarmaPresionBaja = LOW;
+                alarmaPresionBajaOld = LOW;
+              }
+            }
+            checkSensor = HIGH;
+          }
+
+          if ((millis() - contadorCiclo) >= int(exhaleTime * 1000))
+          {
+            motor.setMaxSpeed(0);
+            motor.stop();
+            FSM = 0;
+            checkSensor = LOW;
+            contadorCiclo = millis();
+            numCiclos++;
+            updatenumCiclos++;
+            peepPressureLCD = peepPressure;
+            if ((pressureRead < pressMaxLimit) && (pressureRead < pressMaxMovil))
+            {
+              alarmaPresionAlta = LOW;
+              alarmaPresionAltaOld = LOW;
+            }
+            if (updatenumCiclos > 50)
+            { // Solo actualizo la EEPROM cada 50 ciclos.
+              EEPROM.put(80, numCiclos);
+              updatenumCiclos = 0;
+            }
+            if (digitalRead(sensorPin))
+            {
+              alarmaSensor = HIGH;
+            }
+            if ((digitalRead(startButton)))
+              startCycle = LOW;
+          }
+          break;
+
+        default:
+          break;
+      } // End cases
+    }// End no PSV MODE
+
+    else { //      PSV MODE
+
+      switch (FSM)
+      {
+        case 0:
+          if (peepPressure - pressureRead > 5.0) {
+            contadorCiclo = millis();
+            FSM = 1;
+            motor.setMaxSpeed(inhaleSpeed);
+            motor.moveTo(maxPosition);
+            maxPressure2 = 0.0;
+            hysterisis = LOW;
+          }
+          break;
+
+        case 1: // Inhalation Cycle
+
+          if ((pressureRead > (setPressure)) && !hysterisis)
+          {
+            //          motor.setMaxSpeed(0);
+            motor.stop();
+            hysterisis = HIGH;
+          }
+
+          if (((millis() - contadorCiclo) >= int(inhaleTime * 1000)) || alarmaPresionAlta)
+          { // Condition to change state
+            //          motor.setMaxSpeed(0);
+            motor.stop();
+            delay(2);
+            if ((motor.currentPosition() < 2000) && hysterisis)
+              alarmaBloqueo = HIGH;
+            else
+            {
+              alarmaBloqueo = LOW;
+              alarmaBloqueoOld = LOW;
+            }
+            hysterisis = LOW;
+            motor.setMaxSpeed(exhaleSpeed);
+            contadorCiclo = millis();
+            //          delay(1);
+            FSM = 22;
+          }
+          break;
+
+        case 22:
+          maxPressureLCD = maxPressure2;
+          peepPressure = 99.0;
+          motor.setMaxSpeed(exhaleSpeed);
+          //        delay(1);
+          motor.move(minPosition);
+
+          //        Serial.print(motor.currentPosition());
+          //        Serial.print('\t');
+          //        Serial.println(motor.targetPosition());
+          contadorCiclo = millis();
+          FSM = 2;
+          break;
+
+        case 2: // Exhalation Cycle
+          //        if (digitalRead(sensorPin))
+          //          motor.moveTo(-1200);
+
+          if (!digitalRead(sensorPin))
+          {
+            motor.setMaxSpeed(0);
+            motor.stop();
+            motor.setCurrentPosition(0);
+            if (alarmaSensor)
+            {
+              alarmaSensor = LOW;
+              alarmaSensorOld = LOW;
+            }
+
+            if (!checkSensor)
+            { // Flanco subida sensor regreso
+              // Si hay presion baja
+              if ((maxPressure2 - peepPressure) < pressMinLimit)
+                contadorAlarmaPresionBaja++;
+              else
+                contadorAlarmaPresionBaja = 0;
+
+              if (contadorAlarmaPresionBaja > 1)
+                alarmaPresionBaja = HIGH;
+              else
+              {
+                alarmaPresionBaja = LOW;
+                alarmaPresionBajaOld = LOW;
+              }
+            }
+            checkSensor = HIGH;
+          }
+
+          if ((millis() - contadorCiclo) >= int(exhaleTime * 1000))
+          {
+            motor.setMaxSpeed(0);
+            motor.stop();
+            FSM = 0;
+            checkSensor = LOW;
+            contadorCiclo = millis();
+            numCiclos++;
+            updatenumCiclos++;
+            peepPressureLCD = peepPressure;
+            if ((pressureRead < pressMaxLimit) && (pressureRead < pressMaxMovil))
+            {
+              alarmaPresionAlta = LOW;
+              alarmaPresionAltaOld = LOW;
+            }
+            if (updatenumCiclos > 50)
+            { // Solo actualizo la EEPROM cada 50 ciclos.
+              EEPROM.put(80, numCiclos);
+              updatenumCiclos = 0;
+            }
+            if (digitalRead(sensorPin))
+            {
+              alarmaSensor = HIGH;
+            }
+            if ((digitalRead(startButton)))
+              startCycle = LOW;
+          }
+          break;
+
+        default:
+          break;
+
+
+
+
+      } // End Switch
+    }   // End PSV MODE
   }   // End machine cycle
   dt3 = millis() - t3;
 
