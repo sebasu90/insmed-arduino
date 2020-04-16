@@ -92,16 +92,18 @@ byte contCursor2 = 0;
 
 long currentTime;
 
-bool Start = false;
+bool Start = LOW;
+bool startButtonState = LOW;
 
 bool botonAnterior;
 
 bool Read = LOW;
 
-bool estadoBoton = false;
+bool estadoBoton = LOW;
 long contadorBoton = 0;
 long contadorLCD = 0;
 long contadorBoton2 = 0;
+long contadorBotonStart = 0;
 long contadorCiclo = 0;
 long contadorControl = 0;
 long contadorLectura = 0;
@@ -499,9 +501,9 @@ void loop()
 
     btSerial.print(outputString);
 
-    if (btSerial.presControlAvailable()){
-      
-      }
+    if (btSerial.presControlAvailable()) {
+
+    }
 
     // Serial1.print(outputString);
     // Serial.print(outputString);
@@ -528,6 +530,8 @@ void loop()
     contadorLectura = millis();
 
   } // End Serial
+
+
 
   //  Serial.println(millis() - t1);
   //  t1 = millis();
@@ -579,11 +583,6 @@ void loop()
   else
     digitalWrite(ledAlarm, LOW);
 
-  // if (alarmaeStop && !alarmaeStopOld)
-  // {
-  //   alarmaeStopOld = HIGH;
-  //   newAlarm = HIGH;
-  // }
 
   if (alarmaSensor && !alarmaSensorOld)
   {
@@ -639,7 +638,7 @@ void loop()
     contadorLCD = millis();
     refreshLCD = HIGH;
   }
-  //if ((((FSM == 2) && ((refreshLCD && !alarmas) || newAlarm)) || (!startCycle && (!alarmas || newAlarm))) && refreshLCD) {
+
   if ((!setAlarmas || newAlarm) && refreshLCD)
   {
     if (newAlarm)
@@ -815,13 +814,22 @@ void loop()
     } // End Else no Buzzer
   }   // End If Button Switch
 
+  if (!digitalRead(startButton)) {
+    contadorBotonStart = millis();
+  }
+
+  if ((millis() - contadorBotonStart) > 2000) {
+    contadorBotonStart = millis();
+    startButtonState = !startButtonState;
+  }
+
   if (!startCycle)
   {
     digitalWrite(enPin, HIGH); // disable motor
   }
 
 
-  if (!digitalRead(startButton) || startCycle)
+  if (startButtonState || startCycle)
   { // Start
     startCycle = HIGH;
     digitalWrite(enPin, LOW); // Enable motor
@@ -969,7 +977,7 @@ void loop()
             {
               alarmaSensor = HIGH;
             }
-            if ((digitalRead(startButton)))
+            if ((!startButtonState))
               startCycle = LOW;
           }
           break;
@@ -1095,7 +1103,7 @@ void loop()
             {
               alarmaSensor = HIGH;
             }
-            if ((digitalRead(startButton)))
+            if ((!startButtonState))
               startCycle = LOW;
           }
           break;
