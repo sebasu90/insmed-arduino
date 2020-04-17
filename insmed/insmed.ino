@@ -251,6 +251,9 @@ class BTSerial
     int _ieRatio = 0;
     bool _ieRatioAvailable = LOW;
 
+    int _bpm = 0;
+    bool _bpmAvailable = LOW;
+
     char readingChar = ' ';
     String inputString = "";
 
@@ -261,7 +264,7 @@ class BTSerial
         case PRES_CONTROL_CHAR:
           _presControlAvailable = HIGH;
           _presControl = inputString.toInt();
-          _presControl = min(_presControl, 100);
+          _presControl = min(_presControl, 2);
           readingChar = ' ';
           inputString = "";
           break;
@@ -269,7 +272,15 @@ class BTSerial
         case IE_RATIO_CHAR:
           _ieRatioAvailable = HIGH;
           _ieRatio = inputString.toInt();
-          _presControl = min(_presControl, 1000);
+          _presControl = min(_presControl, 0);
+          readingChar = ' ';
+          inputString = "";
+          break;
+
+        case BPM_CHAR:
+          _bpmAvailable = HIGH;
+          _bpm = inputString.toInt();
+          _bpm = min(_bpm, 1);
           readingChar = ' ';
           inputString = "";
           break;
@@ -371,6 +382,16 @@ class BTSerial
     {
       _presControlAvailable = LOW;
       return _presControl;
+    }
+
+    bool bpmAvailable()
+    {
+      return _bpmAvailable;
+    }
+    int bpm()
+    {
+      _bpmAvailable = LOW;
+      return _bpm;
     }
 
     bool ieRatioAvailable()
