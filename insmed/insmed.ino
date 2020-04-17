@@ -22,9 +22,9 @@ Adafruit_ADS1115 ads(0x48);
 #define startButton A0 // Start switch
 
 // Motor outputs
-#define pulsePin A2
-#define dirPin A3
-#define enPin A4
+#define pulsePin A2 // Motor drive 3
+#define dirPin A3 // Motor drive 2
+#define enPin A4 // Motor drive 1
 //#define alarmPin 5
 
 #define buzzerPin 9
@@ -201,7 +201,7 @@ int readPresControlValue()
   return readEncoderValue(1);
 };
 
-int readIeRatioValue()
+float readIeRatioValue()
 {
   return readEncoderValue(3) / 10.0;
 };
@@ -478,15 +478,6 @@ void setup() //Las instrucciones solo se ejecutan una vez, despues del arranque
 void loop()
 {
 
-  //  if ((!digitalRead(sensorPin)) && goHome) {
-  //    motor.setMaxSpeed(0);
-  //    motor.stop();
-  //    motor.setCurrentPosition(0);
-  //    digitalWrite(enPin, HIGH); // Enable motor
-  //    delay(500);
-  //    goHome = LOW;
-  //  }
-
   // Imprimir Serial ////////////////////////////////////
 
   if ((millis() - contadorLectura) > serialTimer)
@@ -502,21 +493,16 @@ void loop()
     btSerial.print(outputString);
 
     if (btSerial.presControlAvailable()) {
-
+      encoderValue[0] = btSerial.presControl() * 4;
     }
 
-    // Serial1.print(outputString);
-    // Serial.print(outputString);
+    if (btSerial.ieRatioAvailable()) {
+      encoderValue[2] = btSerial.ieRatio() * 40;
+    }
 
-    // Prueba motor
-
-    //    Serial.print(alarmaSensor);
-    //    Serial.print("\t");
-    //    Serial.print(alarmaPresionAlta);
-    //    Serial.print("\t");
-    //    Serial.print(alarmaPresionBaja);
-    //    Serial.print("\t");
-    //    Serial.println(alarmaBloqueo);
+    if (btSerial.bpmAvailable()) {
+      encoderValue[1] = btSerial.bpm() * 4;
+    }
 
     Serial.print(setPressure * 1.1);
     Serial.print("\t");
@@ -555,16 +541,6 @@ void loop()
   //    alarmaBateriaOld = LOW;
   //  }
 
-  //  if (digitalRead(eStopPin))
-  //  {
-  //    alarmaeStop = HIGH;
-  //  }
-  //  else
-  //  {
-  //    alarmaeStop = LOW;
-  //    alarmaeStopOld = LOW;
-  //  }
-
   if (((alarmaSensor || alarmaPresionAlta || alarmaPresionBaja || alarmaAmbu || alarmaSensor2 || alarmaBloqueo) && startCycle) || alarmaeStop || alarmaBateria)
   {
     alarmas = HIGH;
@@ -582,7 +558,6 @@ void loop()
   }
   else
     digitalWrite(ledAlarm, LOW);
-
 
   if (alarmaSensor && !alarmaSensorOld)
   {
@@ -880,14 +855,12 @@ void loop()
 
           if ((pressureRead > (setPressure)) && !hysterisis)
           {
-            //          motor.setMaxSpeed(0);
             motor.stop();
             hysterisis = HIGH;
           }
 
           if (((millis() - contadorCiclo) >= int(inhaleTime * 1000)) || alarmaPresionAlta)
           { // Condition to change state
-            //          motor.setMaxSpeed(0);
             motor.stop();
             delay(2);
             if ((motor.currentPosition() < 2000) && hysterisis)
@@ -911,10 +884,6 @@ void loop()
           motor.setMaxSpeed(exhaleSpeed);
           //        delay(1);
           motor.move(minPosition);
-
-          //        Serial.print(motor.currentPosition());
-          //        Serial.print('\t');
-          //        Serial.println(motor.targetPosition());
           contadorCiclo = millis();
           FSM = 2;
           break;
@@ -1151,7 +1120,7 @@ void updateEncoder()
   int encoded = (MSB << 1) | LSB;         //converting the 2 pin value to single number
   int sum = (lastEncoded << 2) | encoded; //adding it to the previous encoded value
 
-  Serial.println(sum);
+  //  Serial.println(sum);
 
   if (contCursor > 0)
   {
