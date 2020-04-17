@@ -485,18 +485,6 @@ void loop()
 
     btSerial.print(outputString);
 
-    if (btSerial.presControlAvailable()) {
-      encoderValue[0] = btSerial.presControl() * 4;
-    }
-
-    if (btSerial.ieRatioAvailable()) {
-      encoderValue[2] = btSerial.ieRatio() * 40;
-    }
-
-    if (btSerial.bpmAvailable()) {
-      encoderValue[1] = btSerial.bpm() * 4;
-    }
-
     Serial.print(setPressure * 1.1);
     Serial.print("\t");
     Serial.print(setPressure * 0.9);
@@ -509,6 +497,21 @@ void loop()
     contadorLectura = millis();
 
   } // End Serial
+
+
+  btSerial.loop();
+
+  if (btSerial.presControlAvailable()) {
+    encoderValue[0] = btSerial.presControl() * 4;
+  }
+
+  if (btSerial.ieRatioAvailable()) {
+    encoderValue[2] = btSerial.ieRatio() * 40;
+  }
+
+  if (btSerial.bpmAvailable()) {
+    encoderValue[1] = btSerial.bpm() * 4;
+  }
 
   //  if (digitalRead(batteryPin))
   //  {
@@ -529,7 +532,7 @@ void loop()
   //    alarmaBateriaOld = LOW;
   //  }
 
-  // Alarmas //////////
+  ////// Alarmas //////////
 
   if (((alarmaSensor || alarmaPresionAlta || alarmaPresionBaja || alarmaAmbu || alarmaSensor2 || alarmaBloqueo) && startCycle) || alarmaeStop || alarmaBateria)
   {
@@ -692,6 +695,9 @@ void loop()
       switch (FSM)
       {
         case 0:
+          if (psvMode) {
+
+          }
           contadorCiclo = millis();
           FSM = 1;
           motor.setMaxSpeed(inhaleSpeed);
@@ -935,25 +941,12 @@ void loop()
       } // End Switch
     }   // End PSV MODE
   }   // End machine cycle
-  dt3 = millis() - t3;
-
-  btSerial.loop();
-
-  if (btSerial.presControlAvailable())
-  {
-    Serial.println("");
-    Serial.print("presControl ");
-    Serial.println(btSerial.presControl());
-  }
-
-  if (btSerial.ieRatioAvailable())
-  {
-    Serial.println("");
-    Serial.print("ieRatio ");
-    Serial.println(btSerial.ieRatio());
-  }
-
 } //End Loop
+
+
+///////////////////////////////////////////////////
+///////////////////////////////////////////////////
+///////////////////////////////////////////////////
 
 void updateEncoder()
 {
@@ -1366,7 +1359,5 @@ void pinSetup () {
   digitalWrite(encoderPinB, HIGH); //turn pullup resistor on
 
 }
-
-
 
 /*******************************************************/
