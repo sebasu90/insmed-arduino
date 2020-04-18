@@ -134,10 +134,6 @@ int exhaleSpeed = 3200;
 
 signed int minPosition = -4400;
 
-//int maxPosition = 3500;
-//int inhaleSpeed = 3000;
-//int exhaleSpeed = 3000;
-
 bool startCycle = LOW;
 
 long numCiclosOld;
