@@ -123,7 +123,7 @@ long dt3;
 #define serialTimer 100
 #define buttonTimer 110
 #define changeScreenTimer 2000
-#define ledTimer 500
+#define ledTimer 250
 
 byte index = 0;
 byte FSM;
@@ -513,24 +513,24 @@ void loop()
 
   if (digitalRead(batteryPin))
   {
-    delay(3);
-    if (digitalRead(batteryPin))
-    {
-      delay(3);
-      if (digitalRead(batteryPin))
-      {
-        alarmaBateria = HIGH;
-      }
-    }
+    alarmaBateria = HIGH;
+    //    delay(1);
+    //    if (digitalRead(batteryPin))
+    //    {
+    //      delay(3);
+    //      if (digitalRead(batteryPin))
+    //      {
+    //        alarmaBateria = HIGH;
+    //      }
+    //    }
   }
-
   else
   {
     alarmaBateria = LOW;
     alarmaBateriaOld = LOW;
   }
 
-  if (((alarmaSensor || alarmaPresionAlta || alarmaPresionBaja || alarmaAmbu || alarmaSensor2 || alarmaBloqueo) && startCycle) || alarmaeStop || alarmaBateria)
+  if (((alarmaSensor || alarmaPresionAlta || alarmaPresionBaja || alarmaAmbu || alarmaSensor2 || alarmaBloqueo) && startCycle) || alarmaBateria)
   {
     alarmas = HIGH;
   }
@@ -545,8 +545,12 @@ void loop()
       contadorLed = millis();
     }
   }
-  else
-    digitalWrite(ledAlarm, LOW);
+  else {
+    if (startButtonState)
+      digitalWrite(ledAlarm, HIGH);
+    else
+      digitalWrite(ledAlarm, LOW);
+  }
 
   if (alarmaSensor && !alarmaSensorOld)
   {
