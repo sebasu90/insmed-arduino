@@ -1,4 +1,5 @@
 {
     "board": "arduino:avr:micro",
-    "sketch": "insmed\\insmed.ino"
+    "port": "/dev/tty.usbmodem14101",
+    "sketch": "insmed/insmed.ino"
 }
