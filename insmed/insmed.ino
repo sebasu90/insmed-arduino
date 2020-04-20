@@ -17,15 +17,16 @@ Adafruit_ADS1115 ads(0x48);
 #define encoderPinB 11
 #define buttonPin 10
 
+#define startButton 4
 #define batteryPin 8
 #define sensorPin A1   // Inductive sensor to control motor range
-#define startButton A0 // Start switch
+#define rstAlarmPin A0 // Start switch
 
 // Motor outputs
 #define pulsePin A2 // Motor drive 3
 #define dirPin A3 // Motor drive 2
 #define enPin A4 // Motor drive 1
-//#define alarmPin 5
+#define mosfetPin 5
 
 #define buzzerPin 9
 #define ledAlarm 13
@@ -106,8 +107,10 @@ long contadorCiclo = 0;
 long contadorControl = 0;
 long contadorLectura = 0;
 long contadorLed = 0;
+long contadorBuzzer = 0;
 long contadorLecturapresion = 0;
 long contadorHorometro = 0;
+long contadorRstAlarmas = 0;
 
 bool refreshLCD = LOW;
 bool checkSensor = LOW;
@@ -124,6 +127,8 @@ long dt3;
 #define buttonTimer 110
 #define changeScreenTimer 2000
 #define ledTimer 250
+#define buzzerTimer 250
+#define rstAlarmasTimer 110
 
 byte index = 0;
 byte FSM;
@@ -266,7 +271,7 @@ class BTSerial
         case IE_RATIO_CHAR:
           _ieRatioAvailable = HIGH;
           _ieRatio = inputString.toInt();
-          _ieRatio = min(max(_ieRatio, 10),99);
+          _ieRatio = min(max(_ieRatio, 10), 99);
           readingChar = ' ';
           inputString = "";
           break;
@@ -274,7 +279,7 @@ class BTSerial
         case BPM_CHAR:
           _bpmAvailable = HIGH;
           _bpm = inputString.toInt();
-          _bpm = min(max(_bpm, 6),40);
+          _bpm = min(max(_bpm, 6), 40);
           readingChar = ' ';
           inputString = "";
           break;
@@ -401,6 +406,28 @@ class BTSerial
 
 BTSerial btSerial;
 
+byte unlockChar[8] = {
+  B01110,
+  B10001,
+  B10000,
+  B10000,
+  B11111,
+  B11011,
+  B11011,
+  B11111
+};
+
+byte lockChar[8] = {
+  B01110,
+  B10001,
+  B10001,
+  B10001,
+  B11111,
+  B11011,
+  B11011,
+  B11111
+};
+
 /*******************************************************/
 
 /*******************( SETUP )***************************/
@@ -411,6 +438,9 @@ void setup() //Las instrucciones solo se ejecutan una vez, despues del arranque
   btSerial.setup();
 
   pinSetup();
+
+  lcd.createChar(0, unlockChar);
+  lcd.createChar(1, lockChar);
 
   attachInterrupt(digitalPinToInterrupt(encoderPinA), updateEncoder, CHANGE);
 
@@ -472,7 +502,7 @@ float getPEEPValue() {
   return peepPressureLCD;
 }
 
-float getNumCiclosValue() {
+long getNumCiclosValue() {
   return numCiclos;
 }
 
@@ -539,15 +569,6 @@ void loop()
   if (digitalRead(batteryPin))
   {
     alarmaBateria = HIGH;
-    //    delay(1);
-    //    if (digitalRead(batteryPin))
-    //    {
-    //      delay(3);
-    //      if (digitalRead(batteryPin))
-    //      {
-    //        alarmaBateria = HIGH;
-    //      }
-    //    }
   }
   else
   {
@@ -562,7 +583,14 @@ void loop()
   else
     alarmas = LOW;
 
-  digitalWrite(buzzerPin, buzzer);
+  if (buzzer) {
+    if ((millis() - contadorBuzzer) > buzzerTimer) {
+      digitalWrite(buzzerPin, !digitalRead(buzzerPin));
+      contadorBuzzer = millis();
+    }
+  }
+  else
+    digitalWrite(buzzerPin, LOW);
 
   if (alarmas) {
     if (millis() - contadorLed > ledTimer) {
@@ -571,11 +599,14 @@ void loop()
     }
   }
   else {
-    if (startButtonState)
-      digitalWrite(ledAlarm, HIGH);
-    else
-      digitalWrite(ledAlarm, LOW);
+    digitalWrite(ledAlarm, LOW);
   }
+
+  if (startButtonState)
+    digitalWrite(mosfetPin, HIGH);
+  else
+    digitalWrite(mosfetPin, LOW);
+
 
   if (alarmaSensor && !alarmaSensorOld)
   {
@@ -653,9 +684,19 @@ void loop()
     contadorBoton2 = millis();
   }
 
-  if (((millis() - contadorBoton2) > changeScreenTimer) && setAlarmas)
+  if (!digitalRead(rstAlarmPin))
+    contadorRstAlarmas = millis();
+
+  if ((millis() - contadorRstAlarmas) > rstAlarmasTimer) {
+    if (buzzer) {
+      contadorRstAlarmas = millis();
+      buzzer = LOW;
+    }
+  }
+
+  if (((millis() - contadorRstAlarmas) > changeScreenTimer) && setAlarmas)
   {
-    contadorBoton2 = millis();
+    contadorRstAlarmas = millis();
 
     resetAlarmas();
 
@@ -678,21 +719,17 @@ void loop()
 
   if (((millis() - contadorBoton) > buttonTimer))
   {
-    if (buzzer)
-      buzzer = LOW;
-    else
-    {
-      contadorBoton = millis();
-      switchCursor();
+    contadorBoton = millis();
+    switchCursor();
 
-    } // End Else no Buzzer
+    // End Else no Buzzer
   }   // End If Button Switch
 
-  if (!digitalRead(startButton)) {
+  if (digitalRead(startButton)) {
     contadorBotonStart = millis();
   }
 
-  if ((millis() - contadorBotonStart) > 2000) {
+  if ((millis() - contadorBotonStart) > 1000) {
     contadorBotonStart = millis();
     startButtonState = !startButtonState;
   }
@@ -823,7 +860,7 @@ void loop()
           {
             alarmaSensor = HIGH;
           }
-          if ((!startButtonState))
+          if (!startButtonState)
             startCycle = LOW;
         }
         break;
@@ -1251,15 +1288,18 @@ void pinSetup () {
   pinMode(buttonPin, INPUT);
   pinMode(startButton, INPUT);
   pinMode(sensorPin, INPUT);
+  pinMode(rstAlarmPin, INPUT);
 
   pinMode(enPin, OUTPUT);
-
   pinMode(pulsePin, OUTPUT);
   pinMode(dirPin, OUTPUT);
 
   pinMode(buzzerPin, OUTPUT);
   pinMode(ledAlarm, OUTPUT);
 
+  pinMode(mosfetPin, OUTPUT);
+
+  digitalWrite(startButton, HIGH); //turn pullup resistor on
   digitalWrite(encoderPinA, HIGH); //turn pullup resistor on
   digitalWrite(encoderPinB, HIGH); //turn pullup resistor on
 
