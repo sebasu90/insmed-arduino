@@ -464,6 +464,20 @@ void setup() //Las instrucciones solo se ejecutan una vez, despues del arranque
 
 /*******************( LOOP )****************************/
 
+float getPIPValue() {
+  return maxPressureLCD;
+}
+
+float getPEEPValue() {
+  return peepPressureLCD;
+}
+
+float getNumCiclosValue() {
+  return numCiclos;
+}
+
+int btParamSendIndex = 0;
+
 void loop()
 {
 
@@ -477,7 +491,18 @@ void loop()
     outputString += millis();
     outputString += 'p';
     outputString += pressureRead;
+    btParamSendIndex++;
+    if (btParamSendIndex >= 10) {
+      outputString += 'i';
+      outputString += getPIPValue();
+      outputString += 'e';
+      outputString += getPEEPValue();
+      outputString += 'n';
+      outputString += getNumCiclosValue();
+      btParamSendIndex = 0;
+    }
     outputString += ';';
+
 
     btSerial.print(outputString);
 
@@ -905,7 +930,7 @@ void refreshLCDvalues()
 
     case 1:
       lcd.setCursor(5, 0);
-      lcd.print(maxPressureLCD, 1); // PIP
+      lcd.print(getPIPValue(), 1); // PIP
       lcdIndex++;
       break;
 
@@ -923,7 +948,7 @@ void refreshLCDvalues()
 
     case 3:
       lcd.setCursor(5, 1); // PEEP
-      lcd.print(peepPressureLCD, 1);
+      lcd.print(getPEEPValue(), 1);
       lcdIndex++;
       break;
 
@@ -1010,8 +1035,8 @@ void refreshLCDvalues()
 
     case 12:
       lcd.setCursor(14, 3);
-      lcd.print(numCiclos);
-      numCiclosOld = numCiclos;
+      lcd.print(getNumCiclosValue());
+      numCiclosOld = getNumCiclosValue();
       lcdIndex++;
       break;
 
