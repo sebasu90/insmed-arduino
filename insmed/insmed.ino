@@ -258,7 +258,7 @@ class BTSerial
         case PRES_CONTROL_CHAR:
           _presControlAvailable = HIGH;
           _presControl = inputString.toInt();
-          _presControl = max(_presControl, 2);
+          _presControl = min(max(_presControl, 5), 40);
           readingChar = ' ';
           inputString = "";
           break;
@@ -266,7 +266,7 @@ class BTSerial
         case IE_RATIO_CHAR:
           _ieRatioAvailable = HIGH;
           _ieRatio = inputString.toInt();
-          _presControl = max(_presControl, 0);
+          _ieRatio = min(max(_ieRatio, 10),99);
           readingChar = ' ';
           inputString = "";
           break;
@@ -274,7 +274,7 @@ class BTSerial
         case BPM_CHAR:
           _bpmAvailable = HIGH;
           _bpm = inputString.toInt();
-          _bpm = max(_bpm, 1);
+          _bpm = min(max(_bpm, 6),40);
           readingChar = ' ';
           inputString = "";
           break;
