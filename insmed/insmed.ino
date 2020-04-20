@@ -343,7 +343,7 @@ class BTSerial
             Serial.println(res);
         }
 
-        if (inChar == PRES_CONTROL_CHAR || inChar == IE_RATIO_CHAR)
+        if (inChar == PRES_CONTROL_CHAR || inChar == BPM_CHAR || inChar == IE_RATIO_CHAR)
         {
           parseIntoVar();
           readingChar = inChar;
@@ -527,7 +527,7 @@ void loop()
   }
 
   if (btSerial.ieRatioAvailable()) {
-    encoderValue[2] = btSerial.ieRatio() * 40;
+    encoderValue[2] = btSerial.ieRatio() * 4;
   }
 
   if (btSerial.bpmAvailable()) {
