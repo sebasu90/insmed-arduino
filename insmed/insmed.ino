@@ -8,6 +8,34 @@
 #include "src/Adafruit_ADS1X15/Adafruit_ADS1015.h"
 #include "src/AccelStepper/AccelStepper.h"
 
+#if defined(ARDUINO) && ARDUINO >= 100
+#define printByte(args)  write(args);
+#else
+#define printByte(args)  print(args,BYTE);
+#endif
+
+byte unlockChar[8] = {
+  B01110,
+  B10001,
+  B10001,
+  B10001,
+  B11111,
+  B11011,
+  B11011,
+  B11111
+};
+
+byte lockChar[8] = {
+  B01110,
+  B10001,
+  B10000,
+  B10000,
+  B11111,
+  B11011,
+  B11011,
+  B11111
+};
+
 LiquidCrystal_I2C lcd(0x38, 20, 4);
 
 Adafruit_ADS1115 ads(0x48);
@@ -41,6 +69,7 @@ bool alarmaPresionBaja = LOW;
 bool alarmaAmbu = LOW;
 bool alarmaBloqueo = LOW;
 bool alarmaBateria = LOW;
+bool alarmaBateriaBaja = LOW;
 bool buzzer = LOW;
 
 bool alarmas = LOW;
@@ -60,6 +89,7 @@ bool alarmaSensor2Old = LOW;
 bool alarmaAmbuOld = LOW;
 bool alarmaBloqueoOld = LOW;
 bool alarmaBateriaOld = LOW;
+bool alarmaBateriaBajaOld = LOW;
 
 bool alarmaeStop = LOW;
 bool alarmaeStopOld = LOW;
@@ -88,6 +118,9 @@ int16_t adc0; // ADS1015 reading
 
 byte contCursor = 0;
 byte contCursor2 = 0;
+
+bool lockState = LOW;
+bool lockStateOld = LOW;
 
 long currentTime;
 
@@ -406,28 +439,6 @@ class BTSerial
 
 BTSerial btSerial;
 
-byte unlockChar[8] = {
-  B01110,
-  B10001,
-  B10000,
-  B10000,
-  B11111,
-  B11011,
-  B11011,
-  B11111
-};
-
-byte lockChar[8] = {
-  B01110,
-  B10001,
-  B10001,
-  B10001,
-  B11111,
-  B11011,
-  B11011,
-  B11111
-};
-
 /*******************************************************/
 
 /*******************( SETUP )***************************/
@@ -439,7 +450,7 @@ void setup() //Las instrucciones solo se ejecutan una vez, despues del arranque
 
   pinSetup();
 
-  lcd.createChar(0, unlockChar);
+  lcd.createChar(2, unlockChar);
   lcd.createChar(1, lockChar);
 
   attachInterrupt(digitalPinToInterrupt(encoderPinA), updateEncoder, CHANGE);
@@ -487,6 +498,7 @@ void setup() //Las instrucciones solo se ejecutan una vez, despues del arranque
   cargarLCD();
   contCursor2 = 2;
   t1 = millis();
+  lockState = HIGH;
 
 } //Fin del Setup
 
@@ -536,14 +548,14 @@ void loop()
 
     btSerial.print(outputString);
 
-    Serial.print(setPressure * 1.1);
-    Serial.print("\t");
-    Serial.print(setPressure * 0.9);
-    Serial.print("\t");
-    Serial.print(maxPressure);
-    maxPressure = 0.0;
-    Serial.print("\t");
-    Serial.println(setPressure);
+    //    Serial.print(setPressure * 1.1);
+    //    Serial.print("\t");
+    //    Serial.print(setPressure * 0.9);
+    //    Serial.print("\t");
+    //    Serial.print(maxPressure);
+    //    maxPressure = 0.0;
+    //    Serial.print("\t");
+    //    Serial.println(setPressure);
 
     contadorLectura = millis();
 
@@ -565,6 +577,13 @@ void loop()
   }
 
   ////// Alarmas //////////
+
+  if (checkBattery() < 0.0)
+    alarmaBateriaBaja = HIGH;
+  else {
+    alarmaBateriaBaja = LOW;
+    alarmaBateriaBajaOld = LOW;
+  }
 
   if (digitalRead(batteryPin))
   {
@@ -649,6 +668,11 @@ void loop()
     newAlarm = HIGH;
   }
 
+  if (alarmaBateriaBaja && !alarmaBateriaBajaOld) {
+    alarmaBateriaBajaOld = HIGH;
+    newAlarm = HIGH;
+  }
+
   if (newAlarm)
   {
     setAlarmas = HIGH;
@@ -694,6 +718,15 @@ void loop()
     }
   }
 
+  Serial.print(lockState);
+  Serial.print('\t');
+  Serial.println(millis() - contadorBoton2);
+
+  if ((millis() - contadorBoton2) > changeScreenTimer) {
+    contadorBoton2 = millis();
+    lockState = !lockState;
+  }
+
   if (((millis() - contadorRstAlarmas) > changeScreenTimer) && setAlarmas)
   {
     contadorRstAlarmas = millis();
@@ -706,11 +739,12 @@ void loop()
     bpmOld = 98;
     numCiclosOld = 0;
     ieRatioOld = 98;
+    lockState = HIGH;
 
     cargarLCD();
   }
 
-  if (((millis() - contadorBoton2) > 8000))
+  if (((millis() - contadorRstAlarmas) > 8000))
   {
     numCiclos = 0;
     updatenumCiclos = 0;
@@ -1071,13 +1105,36 @@ void refreshLCDvalues()
       break;
 
     case 12:
-      lcd.setCursor(14, 3);
+      lcd.setCursor(12, 3);
       lcd.print(getNumCiclosValue());
       numCiclosOld = getNumCiclosValue();
       lcdIndex++;
       break;
 
     case 13:
+      if (lockState == lockStateOld) {
+        lcdIndex = 15;
+      }
+      else {
+        lcd.setCursor(18, 3);
+        lcdIndex++;
+      }
+      break;
+
+    case 14:
+      if (lockState) {
+        lcd.printByte(byte(1));
+      }
+      else {
+        lcd.printByte(byte(2));
+      }
+      lockStateOld = lockState;
+      //      lcd.setCursor(17, 0);
+      lcdIndex++;
+      break;
+
+
+    case 15:
       if (contCursor == 1)
       {
         lcd.setCursor(17, 0);
@@ -1095,10 +1152,9 @@ void refreshLCDvalues()
       lcdIndex++;
       break;
 
-    case 14:
+    case 16:
       refreshLCD = LOW;
       lcdIndex = 0;
-      dt1 = millis() - t1;
       break;
 
     default:
@@ -1276,7 +1332,21 @@ void displayAlarmas() {
     lcd.setCursor(numCol, numAlarmas);
     lcd.print(F("          "));
     lcd.setCursor(numCol, numAlarmas);
-    lcd.print(F("BATERIA"));
+    lcd.print(F("DESC ELECT"));
+    numAlarmas++;
+  }
+
+  if (alarmaBateriaBaja)
+  {
+    if (numAlarmas > 3)
+    {
+      numAlarmas = 0;
+      numCol = 10;
+    }
+    lcd.setCursor(numCol, numAlarmas);
+    lcd.print(F("          "));
+    lcd.setCursor(numCol, numAlarmas);
+    lcd.print(F("LOW BATT"));
     numAlarmas++;
   }
 }
@@ -1302,6 +1372,11 @@ void pinSetup () {
   digitalWrite(startButton, HIGH); //turn pullup resistor on
   digitalWrite(encoderPinA, HIGH); //turn pullup resistor on
   digitalWrite(encoderPinB, HIGH); //turn pullup resistor on
+
+}
+
+float checkBattery () {
+  return (ads.readADC_SingleEnded(2) / 906.14);
 
 }
 
