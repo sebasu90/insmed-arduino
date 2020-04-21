@@ -450,6 +450,10 @@ void setup() //Las instrucciones solo se ejecutan una vez, despues del arranque
 
   pinSetup();
 
+  lcd.init();
+  lcd.clear();
+  lcd.backlight();
+
   lcd.createChar(2, unlockChar);
   lcd.createChar(1, lockChar);
 
@@ -469,10 +473,6 @@ void setup() //Las instrucciones solo se ejecutan una vez, despues del arranque
   TIMSK1 |= (1 << OCIE1A);
 
   sei(); //allow interrupts
-
-  lcd.init();
-  lcd.clear();
-  lcd.backlight();
 
   contadorLCD = millis();
   contadorLectura = millis();
@@ -548,14 +548,14 @@ void loop()
 
     btSerial.print(outputString);
 
-    //    Serial.print(setPressure * 1.1);
-    //    Serial.print("\t");
-    //    Serial.print(setPressure * 0.9);
-    //    Serial.print("\t");
-    //    Serial.print(maxPressure);
-    //    maxPressure = 0.0;
-    //    Serial.print("\t");
-    //    Serial.println(setPressure);
+    Serial.print(setPressure * 1.1);
+    Serial.print("\t");
+    Serial.print(setPressure * 0.9);
+    Serial.print("\t");
+    Serial.print(maxPressure);
+    maxPressure = 0.0;
+    Serial.print("\t");
+    Serial.println(setPressure);
 
     contadorLectura = millis();
 
@@ -759,14 +759,18 @@ void loop()
     // End Else no Buzzer
   }   // End If Button Switch
 
-  if (digitalRead(startButton)) {
-    contadorBotonStart = millis();
-  }
+  //  if (digitalRead(startButton))
+  startButtonState = !digitalRead(startButton);
 
-  if ((millis() - contadorBotonStart) > 1000) {
-    contadorBotonStart = millis();
-    startButtonState = !startButtonState;
-  }
+  // Pulse Button
+  //  if (digitalRead(startButton)) {
+  //    contadorBotonStart = millis();
+  //  }
+  //
+  //  if ((millis() - contadorBotonStart) > 1000) {
+  //    contadorBotonStart = millis();
+  //    startButtonState = !startButtonState;
+  //  }
 
   if (!startCycle)
   {
