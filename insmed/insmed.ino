@@ -8,12 +8,6 @@
 #include "src/Adafruit_ADS1X15/Adafruit_ADS1015.h"
 #include "src/AccelStepper/AccelStepper.h"
 
-#if defined(ARDUINO) && ARDUINO >= 100
-#define printByte(args)  write(args);
-#else
-#define printByte(args)  print(args,BYTE);
-#endif
-
 byte unlockChar[8] = {
   B01110,
   B10001,
@@ -70,6 +64,8 @@ bool alarmaAmbu = LOW;
 bool alarmaBloqueo = LOW;
 bool alarmaBateria = LOW;
 bool alarmaBateriaBaja = LOW;
+bool alarmaPeep = LOW;
+
 bool buzzer = LOW;
 
 bool alarmas = LOW;
@@ -90,6 +86,7 @@ bool alarmaAmbuOld = LOW;
 bool alarmaBloqueoOld = LOW;
 bool alarmaBateriaOld = LOW;
 bool alarmaBateriaBajaOld = LOW;
+bool alarmaPeepOld = LOW;
 
 bool alarmaeStop = LOW;
 bool alarmaeStopOld = LOW;
@@ -193,6 +190,7 @@ float peepPressure = 0.0; // LCD
 
 float maxPressureLCD;
 float peepPressureLCD;
+float setPeepPressure;
 
 //float compliance;
 //float Volumen;
@@ -578,7 +576,7 @@ void loop()
 
   ////// Alarmas //////////
 
-  if (checkBattery() < 0.0)
+  if (checkBattery() < 22.0)
     alarmaBateriaBaja = HIGH;
   else {
     alarmaBateriaBaja = LOW;
@@ -595,7 +593,7 @@ void loop()
     alarmaBateriaOld = LOW;
   }
 
-  if (((alarmaSensor || alarmaPresionAlta || alarmaPresionBaja || alarmaAmbu || alarmaSensor2 || alarmaBloqueo) && startCycle) || alarmaBateria)
+  if (((alarmaSensor || alarmaPresionAlta || alarmaPeep || alarmaPresionBaja || alarmaAmbu || alarmaSensor2 || alarmaBloqueo) && startCycle) || alarmaBateria || alarmaBateriaBaja)
   {
     alarmas = HIGH;
   }
@@ -668,8 +666,18 @@ void loop()
     newAlarm = HIGH;
   }
 
+  if (alarmaPeep && !alarmaPeepOld) {
+    alarmaPeepOld = HIGH;
+    newAlarm = HIGH;
+  }
+
   if (alarmaBateriaBaja && !alarmaBateriaBajaOld) {
     alarmaBateriaBajaOld = HIGH;
+    newAlarm = HIGH;
+  }
+
+  if (alarmaPeep && !alarmaPeepOld) {
+    alarmaPeepOld = HIGH;
     newAlarm = HIGH;
   }
 
@@ -718,30 +726,36 @@ void loop()
     }
   }
 
-  Serial.print(lockState);
-  Serial.print('\t');
-  Serial.println(millis() - contadorBoton2);
-
   if ((millis() - contadorBoton2) > changeScreenTimer) {
     contadorBoton2 = millis();
-    lockState = !lockState;
+    if (lockState)
+      lockState = LOW;
+    else {
+      contCursor = 0;
+      lcd.noBlink();
+      lockState = HIGH;
+    }
   }
 
-  if (((millis() - contadorRstAlarmas) > changeScreenTimer) && setAlarmas)
+  if (((millis() - contadorRstAlarmas) > changeScreenTimer))
   {
-    contadorRstAlarmas = millis();
+    if (setAlarmas) {
+      contadorRstAlarmas = millis();
 
-    resetAlarmas();
+      resetAlarmas();
 
-    presControlOld = 0.1;
-    peepPressureLCDOld = 0.1;
-    maxPressureLCDOld = 0.1;
-    bpmOld = 98;
-    numCiclosOld = 0;
-    ieRatioOld = 98;
-    lockState = HIGH;
+      presControlOld = 0.1;
+      peepPressureLCDOld = 0.1;
+      maxPressureLCDOld = 0.1;
+      bpmOld = 98;
+      numCiclosOld = 0;
+      ieRatioOld = 98;
+      lockStateOld = !lockState;
 
-    cargarLCD();
+      cargarLCD();
+    }
+    else if (alarmas)
+      newAlarm = HIGH;
   }
 
   if (((millis() - contadorRstAlarmas) > 8000))
@@ -754,7 +768,8 @@ void loop()
   if (((millis() - contadorBoton) > buttonTimer))
   {
     contadorBoton = millis();
-    switchCursor();
+    if (!lockState)
+      switchCursor();
 
     // End Else no Buzzer
   }   // End If Button Switch
@@ -785,7 +800,7 @@ void loop()
 
     updatePressure();
 
-    if (numCiclos > maxnumCiclos)
+    if (((numCiclos % maxnumCiclos) == 0) && (numCiclos != 0))
       alarmaAmbu = HIGH;
 
     if ((pressureRead > pressMaxLimit) || (pressureRead > pressMaxMovil))
@@ -884,6 +899,22 @@ void loop()
           numCiclos++;
           updatenumCiclos++;
           peepPressureLCD = peepPressure;
+          if (!lockState) {
+            setPeepPressure = peepPressure;
+            alarmaPeep = LOW;
+            alarmaPeepOld = LOW;
+          }
+          else {
+            if (abs(setPeepPressure - peepPressure) > 2.0)
+              alarmaPeep = HIGH;
+            else {
+              alarmaPeep = LOW;
+              alarmaPeepOld = LOW;
+            }
+          }
+
+          //          Serial.println(setPeepPressure);
+
           if ((pressureRead < pressMaxLimit) && (pressureRead < pressMaxMovil))
           {
             alarmaPresionAlta = LOW;
@@ -984,6 +1015,7 @@ void cargarLCD()
   lcd.print(F("FR"));
   lcd.setCursor(11, 3);
   lcd.print(F("#"));
+  lcd.noBlink();
 }
 
 void refreshLCDvalues()
@@ -1103,7 +1135,7 @@ void refreshLCDvalues()
       else
       {
         lcd.setCursor(14, 3);
-        lcd.print("      ");
+        lcd.print("     ");
         lcdIndex++;
       }
       break;
@@ -1120,20 +1152,19 @@ void refreshLCDvalues()
         lcdIndex = 15;
       }
       else {
-        lcd.setCursor(18, 3);
+        lcd.setCursor(19, 3);
         lcdIndex++;
       }
       break;
 
     case 14:
       if (lockState) {
-        lcd.printByte(byte(1));
+        lcd.write(byte(2));
       }
       else {
-        lcd.printByte(byte(2));
+        lcd.write(byte(1));
       }
       lockStateOld = lockState;
-      //      lcd.setCursor(17, 0);
       lcdIndex++;
       break;
 
@@ -1240,6 +1271,7 @@ void updatePressure() {
 }
 
 void displayAlarmas() {
+  lcd.noBlink();
   if (numAlarmas == 0)
   {
     lcd.noCursor();
@@ -1255,7 +1287,7 @@ void displayAlarmas() {
     lcd.setCursor(numCol, numAlarmas);
     lcd.print(F("          "));
     lcd.setCursor(numCol, numAlarmas);
-    lcd.print(F(" P. ALTA"));
+    lcd.print(F(" P ALTA"));
     numAlarmas++;
   }
   if (alarmaPresionBaja)
@@ -1268,7 +1300,7 @@ void displayAlarmas() {
     lcd.setCursor(numCol, numAlarmas);
     lcd.print(F("          "));
     lcd.setCursor(numCol, numAlarmas);
-    lcd.print(F(" P. BAJA"));
+    lcd.print(F(" P BAJA"));
     numAlarmas++;
   }
   if (alarmaSensor || alarmaSensor2)
@@ -1281,7 +1313,7 @@ void displayAlarmas() {
     lcd.setCursor(numCol, numAlarmas);
     lcd.print(F("          "));
     lcd.setCursor(numCol, numAlarmas);
-    lcd.print(F("MECANISMO"));
+    lcd.print(F("FALLA GRAL"));
     numAlarmas++;
   }
 
@@ -1295,7 +1327,7 @@ void displayAlarmas() {
     lcd.setCursor(numCol, numAlarmas);
     lcd.print(F("          "));
     lcd.setCursor(numCol, numAlarmas);
-    lcd.print(F("CAMBIO AMBU"));
+    lcd.print(F(" REV AMBU"));
     numAlarmas++;
   }
   if (alarmaBloqueo)
@@ -1312,7 +1344,7 @@ void displayAlarmas() {
     numAlarmas++;
   }
 
-  if (alarmaeStop)
+  if (alarmaPeep)
   {
     if (numAlarmas > 3)
     {
@@ -1322,7 +1354,7 @@ void displayAlarmas() {
     lcd.setCursor(numCol, numAlarmas);
     lcd.print(F("          "));
     lcd.setCursor(numCol, numAlarmas);
-    lcd.print(F("  E STOP"));
+    lcd.print(F("   PEEP"));
     numAlarmas++;
   }
 
@@ -1350,7 +1382,7 @@ void displayAlarmas() {
     lcd.setCursor(numCol, numAlarmas);
     lcd.print(F("          "));
     lcd.setCursor(numCol, numAlarmas);
-    lcd.print(F("LOW BATT"));
+    lcd.print(F("BAT BAJA"));
     numAlarmas++;
   }
 }
