@@ -13,6 +13,9 @@ volatile int motorPulses = 0;
 int nBase;
 volatile int frecIndex = 0;
 bool pulsePinState;
+bool dirState;
+int nSubida = 4;
+int nBajada = 3;
 
 byte unlockChar[8] = {
   B01110,
@@ -186,7 +189,7 @@ float ieRatioOld;
 float peepPressureLCDOld = 98;
 float maxPressureLCDOld = 98;
 
-float minBattVoltage = 22.5;
+float minBattVoltage = 0.0;
 
 #define maxnumCiclos 60000
 
@@ -472,7 +475,7 @@ void setup() //Las instrucciones solo se ejecutan una vez, despues del arranque
   TCCR1B = 0; // same for TCCR1B
   TCNT1 = 0;  //initialize counter value to 0
   // set compare match register for 1hz increments
-  OCR1A = 1600; // = Crystal of 16Mhz / 1600 cycles = 10 kHz Timer 1 frequency
+  OCR1A = 800; // = Crystal of 16Mhz / 800 cycles = 20 kHz Timer 1 frequency
   // turn on CTC mode
   TCCR1B |= (1 << WGM12);
   // Set CS10 for no prescaler
@@ -566,17 +569,13 @@ void loop()
     Serial.print(maxPressure);
     Serial.println(setPressure);
 
-    //    Serial.print(FSM);
+    //    Serial.print(motorPulses);
     //    Serial.print("\t");
-    //    Serial.print(digitalRead(enPin));
+    //    Serial.print(785 + 36 * presControl);
     //    Serial.print("\t");
-    //    Serial.print(motor.distanceToGo());
+    //    Serial.print(alarmaBloqueo);
     //    Serial.print("\t");
-    //    Serial.print(motor.speed());
-    //    Serial.print("\t");
-    //    Serial.println(startButtonState);
-
-
+    //    Serial.println(hysterisis);
 
     contadorLectura = millis();
 
@@ -797,18 +796,7 @@ void loop()
     // End Else no Buzzer
   }   // End If Button Switch
 
-  //  if (digitalRead(startButton))
   startButtonState = !digitalRead(startButton);
-
-  // Pulse Button
-  //  if (digitalRead(startButton)) {
-  //    contadorBotonStart = millis();
-  //  }
-  //
-  //  if ((millis() - contadorBotonStart) > 1000) {
-  //    contadorBotonStart = millis();
-  //    startButtonState = !startButtonState;
-  //  }
 
   if (startButtonState && !startCycle) {
     startCycle = HIGH;
@@ -828,11 +816,12 @@ void loop()
     {
       case 0:
         if ((psvMode && (peepPressure - pressureRead > 5.0)) || (!psvMode)) {
-          nBase = 8;
+          nBase = nSubida;
+          digitalWrite(dirPin, HIGH);
+          dirState = HIGH;
           contadorCiclo = millis();
           FSM = 1;
           motorRun = HIGH;
-          //          motor.moveTo(maxPosition);
           maxPressure2 = 0.0;
           hysterisis = LOW;
         }
@@ -842,25 +831,33 @@ void loop()
 
         if ((pressureRead > (setPressure)) && !hysterisis)
         {
-          motor.stop();
+          motorRun = LOW;
           hysterisis = HIGH;
         }
 
         if (((millis() - contadorCiclo) >= int(inhaleTime * 1000)) || alarmaPresionAlta)
         { // Condition to change state
-          motor.stop();
-          delay(2);
-          if ((motor.currentPosition() < 2000) && hysterisis)
+          motorRun = LOW;
+          if ((motorPulses < (785 + 36 * presControl)) && hysterisis)
             alarmaBloqueo = HIGH;
           else
           {
             alarmaBloqueo = LOW;
             alarmaBloqueoOld = LOW;
           }
+          if (!digitalRead(sensorPin))
+            alarmaSensor2 = HIGH;
+          else {
+            alarmaSensor2 = LOW;
+            alarmaSensor2Old = LOW;
+
+          }
+
           hysterisis = LOW;
-          motor.setMaxSpeed(exhaleSpeed);
+          nBase = nBajada;
+          digitalWrite(dirPin, LOW);
+          dirState = LOW;
           contadorCiclo = millis();
-          //          delay(1);
           FSM = 22;
         }
         break;
@@ -868,8 +865,7 @@ void loop()
       case 22:
         maxPressureLCD = maxPressure2;
         peepPressure = 99.0;
-        motor.setMaxSpeed(exhaleSpeed);
-        motor.move(minPosition);
+        motorRun = HIGH;
         contadorCiclo = millis();
         FSM = 2;
         break;
@@ -881,8 +877,8 @@ void loop()
         if (!digitalRead(sensorPin))
         {
           //            motor.setMaxSpeed(0);
-          motor.stop();
-          motor.setCurrentPosition(0);
+          motorRun = LOW;
+          motorPulses = 0;
           if (alarmaSensor)
           {
             alarmaSensor = LOW;
@@ -911,7 +907,7 @@ void loop()
         if ((millis() - contadorCiclo) >= int(exhaleTime * 1000))
         {
           //          motor.setMaxSpeed(0);
-          motor.stop();
+          motorRun = LOW;
           FSM = 0;
           checkSensor = LOW;
           contadorCiclo = millis();
@@ -1011,15 +1007,25 @@ float readPressure()
 }
 
 ISR(TIMER1_COMPA_vect) {
-  if (motorRun) {
-    frecIndex++;
-    if (frecIndex >= nBase) { // Frec Base
-      frecIndex = 0;
-      pulsePinState = !pulsePinState;
-      digitalWrite(pulsePin, pulsePinState);
-      if (pulsePinState)
-        motorPulses++;
-    } // End Frec Base
+  if (motorRun && startCycle) {
+    if (((motorPulses < maxPosition) && dirState) || ((motorPulses > minPosition) && !dirState)) {
+      //      dt1 = micros() - t1;
+      //      t1 = micros();
+      frecIndex++;
+      if (frecIndex >= nBase) { // Frec Base
+        frecIndex = 0;
+        pulsePinState = !pulsePinState;
+        digitalWrite(pulsePin, pulsePinState);
+        //        dt2 = micros() - t2;
+        //        t2 = micros();
+        if (pulsePinState) {
+          if (dirState)
+            motorPulses++;
+          else
+            motorPulses--;
+        }
+      } // End Frec Base
+    }
   } // If no motor run
 }
 
