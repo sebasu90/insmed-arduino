@@ -178,7 +178,10 @@ float ieRatioOld;
 float peepPressureLCDOld = 98;
 float maxPressureLCDOld = 98;
 
+float minBattVoltage = 22.5;
+
 #define maxnumCiclos 60000
+
 long numCiclos; // Not so frequecnt EEPROM write
 byte updatenumCiclos = 0;
 
@@ -553,7 +556,20 @@ void loop()
     Serial.print(maxPressure);
     maxPressure = 0.0;
     Serial.print("\t");
+    Serial.print(maxPressure);
     Serial.println(setPressure);
+
+    //    Serial.print(FSM);
+    //    Serial.print("\t");
+    //    Serial.print(digitalRead(enPin));
+    //    Serial.print("\t");
+    //    Serial.print(motor.distanceToGo());
+    //    Serial.print("\t");
+    //    Serial.print(motor.speed());
+    //    Serial.print("\t");
+    //    Serial.println(startButtonState);
+
+
 
     contadorLectura = millis();
 
@@ -576,7 +592,7 @@ void loop()
 
   ////// Alarmas //////////
 
-  if (checkBattery() < 22.0)
+  if (checkBattery() < minBattVoltage)
     alarmaBateriaBaja = HIGH;
   else {
     alarmaBateriaBaja = LOW;
@@ -787,17 +803,22 @@ void loop()
   //    startButtonState = !startButtonState;
   //  }
 
+  //  if (startButtonState && !startCycle) {
+  //    digitalWrite(enPin, LOW); // Enable motor
+  //    startCycle = HIGH;
+  //    motor.setCurrentPosition(0);
+  //    motor.stop();
+  //    motor.setMaxSpeed(inhaleSpeed);
+  //    delay(800);
+  //  }
+
   if (!startCycle)
   {
-    digitalWrite(enPin, HIGH); // disable motor
+    //    digitalWrite(enPin, HIGH); // disable motor
   }
-
 
   if (startButtonState || startCycle)
   { // Start
-    startCycle = HIGH;
-    digitalWrite(enPin, LOW); // Enable motor
-
     updatePressure();
 
     if (((numCiclos % maxnumCiclos) == 0) && (numCiclos != 0))
@@ -810,9 +831,10 @@ void loop()
     {
       case 0:
         if ((psvMode && (peepPressure - pressureRead > 5.0)) || (!psvMode)) {
+          motor.setMaxSpeed(inhaleSpeed);
+          delay(1);
           contadorCiclo = millis();
           FSM = 1;
-          motor.setMaxSpeed(inhaleSpeed);
           motor.moveTo(maxPosition);
           maxPressure2 = 0.0;
           hysterisis = LOW;
@@ -891,7 +913,7 @@ void loop()
 
         if ((millis() - contadorCiclo) >= int(exhaleTime * 1000))
         {
-          motor.setMaxSpeed(0);
+          //          motor.setMaxSpeed(0);
           motor.stop();
           FSM = 0;
           checkSensor = LOW;
@@ -1413,7 +1435,6 @@ void pinSetup () {
 
 float checkBattery () {
   return (ads.readADC_SingleEnded(2) / 906.14);
-
 }
 
 /*******************************************************/
