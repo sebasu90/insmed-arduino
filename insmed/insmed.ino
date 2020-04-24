@@ -164,10 +164,12 @@ byte index = 0;
 byte FSM;
 
 int maxPosition = 2500;
-int inhaleSpeed = 2800;
-int exhaleSpeed = 3200;
+int inhaleSpeed = 2500;
+int exhaleSpeed = 4150;
 
-signed int minPosition = -4400;
+int mindelay = 10;
+
+signed int minPosition = -2500;
 
 bool startCycle = LOW;
 
@@ -491,8 +493,8 @@ void setup() //Las instrucciones solo se ejecutan una vez, despues del arranque
   EEPROM.get(70, encoderValue[6]);
   EEPROM.get(80, numCiclos);
 
-  motor.setAcceleration(20000.0); // To test
-  motor.setMinPulseWidth(25);
+  motor.setAcceleration(50000.0); // To test
+  motor.setMinPulseWidth(mindelay);
 
   offsetPresion = ads.readADC_SingleEnded(1);
 
@@ -803,19 +805,19 @@ void loop()
   //    startButtonState = !startButtonState;
   //  }
 
-  //  if (startButtonState && !startCycle) {
-  //    digitalWrite(enPin, LOW); // Enable motor
-  //    startCycle = HIGH;
-  //    motor.setCurrentPosition(0);
-  //    motor.stop();
-  //    motor.setMaxSpeed(inhaleSpeed);
-  //    delay(800);
-  //  }
-
-  if (!startCycle)
-  {
-    //    digitalWrite(enPin, HIGH); // disable motor
+  if (startButtonState && !startCycle) {
+    //    digitalWrite(enPin, LOW); // Enable motor
+    startCycle = HIGH;
+    //    motor.setCurrentPosition(0);
+    //    motor.stop();
+    //    motor.setMaxSpeed(inhaleSpeed);
+    //    delay(800);
   }
+
+  //  if (!startCycle)
+  //  {
+  //   digitalWrite(enPin, HIGH); // disable motor
+  //  }
 
   if (startButtonState || startCycle)
   { // Start
