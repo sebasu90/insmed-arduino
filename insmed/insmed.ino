@@ -6,7 +6,13 @@
 #include <Wire.h>
 #include "src/LiquidCrystal_I2C/LiquidCrystal_I2C.h"
 #include "src/Adafruit_ADS1X15/Adafruit_ADS1015.h"
-#include "src/AccelStepper/AccelStepper.h"
+//#include "src/AccelStepper/AccelStepper.h"
+
+bool motorRun = LOW;
+volatile int motorPulses = 0;
+int nBase;
+volatile int frecIndex = 0;
+bool pulsePinState;
 
 byte unlockChar[8] = {
   B01110,
@@ -103,7 +109,7 @@ byte contadorAlarmaPresionBaja = 0;
 
 byte lcdIndex;
 
-AccelStepper motor(AccelStepper::DRIVER, pulsePin, dirPin);
+//AccelStepper motor(AccelStepper::DRIVER, pulsePin, dirPin);
 
 volatile int lastEncoded = 0;
 volatile int encoderValue[10];
@@ -405,7 +411,6 @@ class BTSerial
       if (handShaked)
       {
         Serial1.print(in);
-        // Serial.print(in);
       }
     }
 
@@ -467,7 +472,7 @@ void setup() //Las instrucciones solo se ejecutan una vez, despues del arranque
   TCCR1B = 0; // same for TCCR1B
   TCNT1 = 0;  //initialize counter value to 0
   // set compare match register for 1hz increments
-  OCR1A = 3200; // = Crystal of 16Mhz / 3200 cycles = 5 kHz Timer 1 frequency
+  OCR1A = 1600; // = Crystal of 16Mhz / 1600 cycles = 10 kHz Timer 1 frequency
   // turn on CTC mode
   TCCR1B |= (1 << WGM12);
   // Set CS10 for no prescaler
@@ -493,14 +498,14 @@ void setup() //Las instrucciones solo se ejecutan una vez, despues del arranque
   EEPROM.get(70, encoderValue[6]);
   EEPROM.get(80, numCiclos);
 
-  motor.setAcceleration(50000.0); // To test
-  motor.setMinPulseWidth(mindelay);
+  //  motor.setAcceleration(50000.0); // To test
+  //  motor.setMinPulseWidth(mindelay);
 
   offsetPresion = ads.readADC_SingleEnded(1);
 
   cargarLCD();
   contCursor2 = 2;
-  t1 = millis();
+  //  t1 = millis();
   lockState = HIGH;
 
 } //Fin del Setup
@@ -806,18 +811,8 @@ void loop()
   //  }
 
   if (startButtonState && !startCycle) {
-    //    digitalWrite(enPin, LOW); // Enable motor
     startCycle = HIGH;
-    //    motor.setCurrentPosition(0);
-    //    motor.stop();
-    //    motor.setMaxSpeed(inhaleSpeed);
-    //    delay(800);
   }
-
-  //  if (!startCycle)
-  //  {
-  //   digitalWrite(enPin, HIGH); // disable motor
-  //  }
 
   if (startButtonState || startCycle)
   { // Start
@@ -833,11 +828,11 @@ void loop()
     {
       case 0:
         if ((psvMode && (peepPressure - pressureRead > 5.0)) || (!psvMode)) {
-          motor.setMaxSpeed(inhaleSpeed);
-          delay(1);
+          nBase = 8;
           contadorCiclo = millis();
           FSM = 1;
-          motor.moveTo(maxPosition);
+          motorRun = HIGH;
+          //          motor.moveTo(maxPosition);
           maxPressure2 = 0.0;
           hysterisis = LOW;
         }
@@ -1015,10 +1010,24 @@ float readPressure()
   return ((71.38 * (adc0 - offsetPresion) / offsetPresion) * 1.197 + 0.38);
 }
 
-ISR(TIMER1_COMPA_vect)
-{
-  motor.run(); // Motor keepalive (at least once per step).
+ISR(TIMER1_COMPA_vect) {
+  if (motorRun) {
+    frecIndex++;
+    if (frecIndex >= nBase) { // Frec Base
+      frecIndex = 0;
+      pulsePinState = !pulsePinState;
+      digitalWrite(pulsePin, pulsePinState);
+      if (pulsePinState)
+        motorPulses++;
+    } // End Frec Base
+  } // If no motor run
 }
+
+//bool motorRun = LOW;
+//volatile int motorPulses = 0;
+//int nBase;
+//volatile int frecIndex = 0;
+
 
 void cargarLCD()
 {
