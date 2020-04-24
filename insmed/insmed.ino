@@ -164,10 +164,10 @@ byte index = 0;
 byte FSM;
 
 int maxPosition = 2500;
-int inhaleSpeed = 2500;
-int exhaleSpeed = 4150;
+int inhaleSpeed = 2300;
+int exhaleSpeed = 3500;
 
-int mindelay = 10;
+int mindelay = 8;
 
 signed int minPosition = -2500;
 
