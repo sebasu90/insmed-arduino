@@ -1,7 +1,3 @@
-/**
-  TO DO:
-*/
-
 #include <EEPROM.h>
 #include <Wire.h>
 #include "src/LiquidCrystal_I2C/LiquidCrystal_I2C.h"
@@ -189,7 +185,7 @@ float ieRatioOld;
 float peepPressureLCDOld = 98;
 float maxPressureLCDOld = 98;
 
-float minBattVoltage = 0.0;
+float minBattVoltage = 22.5;
 
 #define maxnumCiclos 60000
 
@@ -567,6 +563,8 @@ void loop()
     maxPressure = 0.0;
     Serial.print("\t");
     Serial.print(maxPressure);
+    Serial.print("\t");
+    //    Serial.print(checkBattery());
     Serial.println(setPressure);
 
     //    Serial.print(motorPulses);
@@ -866,6 +864,14 @@ void loop()
             alarmaSensor2Old = LOW;
           }
 
+          if (maxPressure2 < (setPressure * 0.8)) {
+            alarmaPresionBaja2 = HIGH;
+          }
+          else {
+            alarmaPresionBaja2Old = LOW;
+            alarmaPresionBaja2 = LOW;
+          }
+
           hysterisis = LOW;
           nBase = nBajada;
           digitalWrite(dirPin, LOW);
@@ -877,15 +883,6 @@ void loop()
 
       case 22:
         maxPressureLCD = maxPressure2;
-
-        if (maxPressure2 < setPressure * 0.8) {
-          alarmaPresionBaja2 = HIGH;
-        }
-        else {
-          alarmaPresionBaja2Old = LOW;
-          alarmaPresionBaja2 = LOW;
-        }
-
         peepPressure = 99.0;
         motorRun = HIGH;
         contadorCiclo = millis();
@@ -893,12 +890,9 @@ void loop()
         break;
 
       case 2: // Exhalation Cycle
-        //        if (digitalRead(sensorPin))
-        //          motor.moveTo(-1200);
 
         if (!digitalRead(sensorPin))
         {
-          //            motor.setMaxSpeed(0);
           motorRun = LOW;
           motorPulses = 0;
           if (alarmaSensor)
@@ -928,7 +922,6 @@ void loop()
 
         if ((millis() - contadorCiclo) >= int(exhaleTime * 1000))
         {
-          //          motor.setMaxSpeed(0);
           motorRun = LOW;
           FSM = 0;
           checkSensor = LOW;
@@ -1048,12 +1041,6 @@ ISR(TIMER1_COMPA_vect) {
     }
   } // If no motor run
 }
-
-//bool motorRun = LOW;
-//volatile int motorPulses = 0;
-//int nBase;
-//volatile int frecIndex = 0;
-
 
 void cargarLCD()
 {
@@ -1315,8 +1302,6 @@ void updatePressure() {
   if ((pressureRead < peepPressure) && pressureRead > -70.0 && ((millis() - contadorCiclo) < 1000) && FSM == 2)
     peepPressure = pressureRead;
 
-  //  if (FSM != 2)
-  //  {
   setPressure = presControl + peepPressure;
   pressMinMovil = setPressure * 0.8;
   pressMaxMovil = setPressure * 1.2;
@@ -1344,7 +1329,7 @@ void displayAlarmas() {
     lcd.print(F(" P ALTA"));
     numAlarmas++;
   }
-  if (alarmaPresionBaja)
+  if (alarmaPresionBaja2)
   {
     if (numAlarmas > 3)
     {
@@ -1358,7 +1343,7 @@ void displayAlarmas() {
     numAlarmas++;
   }
 
-  if (alarmaPresionBaja2)
+  if (alarmaPresionBaja)
   {
     if (numAlarmas > 3)
     {
