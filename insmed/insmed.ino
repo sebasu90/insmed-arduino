@@ -13,6 +13,8 @@ bool dirState;
 int nSubida = 4;
 int nBajada = 3;
 
+int peepIndex = 0;
+
 byte unlockChar[8] = {
   B01110,
   B10001,
@@ -555,16 +557,13 @@ void loop()
 
     btSerial.print(outputString);
 
-    Serial.print(setPressure * 1.1);
-    Serial.print("\t");
-    Serial.print(setPressure * 0.9);
-    Serial.print("\t");
+    //    Serial.print(peepPressure);
+    //    Serial.print("\t");
+    //    Serial.print(peepIndex);
+    //    Serial.print("\t");
     Serial.print(maxPressure);
     maxPressure = 0.0;
     Serial.print("\t");
-    Serial.print(maxPressure);
-    Serial.print("\t");
-    //    Serial.print(checkBattery());
     Serial.println(setPressure);
 
     //    Serial.print(motorPulses);
@@ -847,7 +846,7 @@ void loop()
           hysterisis = HIGH;
         }
 
-        if (((millis() - contadorCiclo) >= int(inhaleTime * 1000)) || alarmaPresionAlta)
+        if (((millis() - contadorCiclo) >= int(inhaleTime * 1000) + 150) || alarmaPresionAlta)
         { // Condition to change state
           motorRun = LOW;
           if ((motorPulses < (785 + 36 * presControl)) && hysterisis)
@@ -920,7 +919,7 @@ void loop()
           checkSensor = HIGH;
         }
 
-        if ((millis() - contadorCiclo) >= int(exhaleTime * 1000))
+        if ((millis() - contadorCiclo) >= int(exhaleTime * 1000 - 150))
         {
           motorRun = LOW;
           FSM = 0;
@@ -1016,8 +1015,8 @@ float readPressure()
 {
   adc0 = ads.readADC_SingleEnded(0);
   //    return ((71.38 * (adc0 - offsetPresion) / offsetPresion));
-  return ((71.38 * (adc0 - offsetPresion) / offsetPresion)); // No correction
-//  return ((71.38 * (adc0 - offsetPresion) / offsetPresion) * 1.197 + 0.38);
+  return ((71.38 * (adc0 - offsetPresion) / offsetPresion) * 1.1128); // No scorrection
+  //  return ((71.38 * (adc0 - offsetPresion) / offsetPresion) * 1.197 + 0.38);
 }
 
 ISR(TIMER1_COMPA_vect) {
@@ -1300,10 +1299,20 @@ void updatePressure() {
   if (pressureRead > maxPressure)
     maxPressure = pressureRead;
 
-  if ((pressureRead < peepPressure) && pressureRead > -70.0 && ((millis() - contadorCiclo) < 1000) && FSM == 2)
+  if ((pressureRead < peepPressure) && pressureRead > -70.0 && ((millis() - contadorCiclo) < 1000) && FSM == 2) {
     peepPressure = pressureRead;
+    peepIndex = 0;
+  }
 
-  setPressure = presControl + peepPressure;
+//  if (pressureRead > -70.0 && ((millis() - contadorCiclo) > 200) && FSM == 2) {
+//    peepIndex++;
+//    peepPressure = (pressureRead + peepPressure * peepIndex) / (peepIndex + 1);
+//  }
+
+  if (peepPressure < 0.0)
+    peepPressure = 0.0;
+
+  setPressure = presControl + peepPressureLCD;
   pressMinMovil = setPressure * 0.8;
   pressMaxMovil = setPressure * 1.2;
   //  }
