@@ -1016,7 +1016,8 @@ float readPressure()
 {
   adc0 = ads.readADC_SingleEnded(0);
   //    return ((71.38 * (adc0 - offsetPresion) / offsetPresion));
-  return ((71.38 * (adc0 - offsetPresion) / offsetPresion) * 1.197 + 0.38);
+  return ((71.38 * (adc0 - offsetPresion) / offsetPresion)); // No correction
+//  return ((71.38 * (adc0 - offsetPresion) / offsetPresion) * 1.197 + 0.38);
 }
 
 ISR(TIMER1_COMPA_vect) {
