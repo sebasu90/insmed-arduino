@@ -408,10 +408,10 @@ class BTSerial
 
     void print(String in)
     {
-      //      if (handShaked)
-      //      {
-      Serial1.print(in);
-      //      }
+      if (handShaked)
+      {
+        Serial1.print(in);
+      }
     }
 
     bool presControlAvailable()
@@ -575,6 +575,7 @@ void loop()
     outputString += ';';
 
     btSerial.print(outputString);
+//    Serial.println(outputString);
 
     //    SPI.transfer('a');
 
@@ -582,10 +583,10 @@ void loop()
     //    Serial.print("\t");
     //    Serial.print(peepIndex);
     //    Serial.print("\t");
-    Serial.print(maxPressure);
-    maxPressure = 0.0;
-    Serial.print("\t");
-    Serial.println(setPressure);
+    //    Serial.print(maxPressure);
+    //    maxPressure = 0.0;
+    //    Serial.print("\t");
+    //    Serial.println(setPressure);
 
     //    Serial.print(motorPulses);
     //    Serial.print("\t");
