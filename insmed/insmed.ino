@@ -160,7 +160,7 @@ long dt3;
 
 #define lcdTimer 600
 #define serialTimer 100
-#define buttonTimer 110
+#define buttonTimer 130
 #define changeScreenTimer 2000
 #define ledTimer 250
 #define buzzerTimer 250
@@ -1268,6 +1268,7 @@ void switchCursor () {
 
   else if (contCursor == 1)
   {
+    lcd.blink();
     EEPROM.put(contCursor * 10, encoderValue[contCursor - 1]);
     contCursor = 2;
   }
@@ -1281,14 +1282,14 @@ void switchCursor () {
   else if (contCursor == 3)
   {
     EEPROM.put(contCursor * 10, encoderValue[contCursor - 1]);
-    lcd.noBlink();
-    contCursor = 0;
+    //    lcd.noBlink();
+    contCursor = 1;
   }
 
   else if (contCursor > 3)
   {
-    contCursor = 0;
-    lcd.noBlink();
+    contCursor = 1;
+    //    lcd.noBlink();
   }
 }  //
 
