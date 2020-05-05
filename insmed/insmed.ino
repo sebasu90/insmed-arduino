@@ -408,10 +408,10 @@ class BTSerial
 
     void print(String in)
     {
-      if (handShaked)
-      {
+//      if (handShaked)
+//      {
         Serial1.print(in);
-      }
+//      }
     }
 
     bool presControlAvailable()
