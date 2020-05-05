@@ -2,7 +2,6 @@
 #include <Wire.h>
 #include "src/LiquidCrystal_I2C/LiquidCrystal_I2C.h"
 #include "src/Adafruit_ADS1X15/Adafruit_ADS1015.h"
-//#include "src/AccelStepper/AccelStepper.h"
 
 bool motorRun = LOW;
 volatile int motorPulses = 0;
@@ -409,10 +408,10 @@ class BTSerial
 
     void print(String in)
     {
-      if (handShaked)
-      {
-        Serial1.print(in);
-      }
+      //      if (handShaked)
+      //      {
+      Serial1.print(in);
+      //      }
     }
 
     bool presControlAvailable()
@@ -449,6 +448,18 @@ class BTSerial
 BTSerial btSerial;
 
 /*******************************************************/
+
+//int spiIndex;
+//
+//ISR (SPI_STC_vect)
+//{
+//  byte Slavereceived = SPDR;
+//  Serial.print("Send: ");
+//  Serial.println(spiIndex);
+//  spiIndex++;
+//  if (Slavereceived == 1)
+//    SPDR = spiIndex;
+//}
 
 /*******************( SETUP )***************************/
 
@@ -499,15 +510,20 @@ void setup() //Las instrucciones solo se ejecutan una vez, despues del arranque
   EEPROM.get(70, encoderValue[6]);
   EEPROM.get(80, numCiclos);
 
-  //  motor.setAcceleration(50000.0); // To test
-  //  motor.setMinPulseWidth(mindelay);
-
   offsetPresion = ads.readADC_SingleEnded(1);
 
   cargarLCD();
   contCursor2 = 2;
   //  t1 = millis();
   lockState = HIGH;
+
+  //  pinMode(MISO, OUTPUT); // have to send on master in so it set as output
+  //  SPCR |= _BV(SPE); // turn on SPI in slave mode
+
+  //  SPI.begin();
+  //  SPI.setClockDivider(SPI_CLOCK_DIV2);//divide the clock by 4
+
+  //  SPI.attachInterrupt(); // turn on interrupt
 
 } //Fin del Setup
 
@@ -544,6 +560,10 @@ void loop()
     outputString += pressureRead;
     btParamSendIndex++;
     if (btParamSendIndex >= 10) {
+      outputString += 'b';
+      outputString += readBpmValue();
+      outputString += 'r';
+      outputString += readIeRatioValue();
       outputString += 'i';
       outputString += getPIPValue();
       outputString += 'e';
@@ -554,8 +574,9 @@ void loop()
     }
     outputString += ';';
 
-
     btSerial.print(outputString);
+
+    //    SPI.transfer('a');
 
     //    Serial.print(peepPressure);
     //    Serial.print("\t");
@@ -1304,10 +1325,10 @@ void updatePressure() {
     peepIndex = 0;
   }
 
-//  if (pressureRead > -70.0 && ((millis() - contadorCiclo) > 200) && FSM == 2) {
-//    peepIndex++;
-//    peepPressure = (pressureRead + peepPressure * peepIndex) / (peepIndex + 1);
-//  }
+  //  if (pressureRead > -70.0 && ((millis() - contadorCiclo) > 200) && FSM == 2) {
+  //    peepIndex++;
+  //    peepPressure = (pressureRead + peepPressure * peepIndex) / (peepIndex + 1);
+  //  }
 
   if (peepPressure < 0.0)
     peepPressure = 0.0;
