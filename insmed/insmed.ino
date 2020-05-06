@@ -408,10 +408,10 @@ class BTSerial
 
     void print(String in)
     {
-      if (handShaked)
-      {
+//      if (handShaked)
+//      {
         Serial1.print(in);
-      }
+//      }
     }
 
     bool presControlAvailable()
@@ -575,7 +575,7 @@ void loop()
     outputString += ';';
 
     btSerial.print(outputString);
-//    Serial.println(outputString);
+    Serial.println(outputString);
 
     //    SPI.transfer('a');
 
