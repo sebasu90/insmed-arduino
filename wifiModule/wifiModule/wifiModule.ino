@@ -10,8 +10,8 @@ HardwareSerial myserial(2);
 /****************************************
    Define Constants
  ****************************************/
-#define WIFISSID "GAMA_JARAM" // Put your WifiSSID here
-#define PASSWORD "1128395065" // Put your wifi password here
+#define WIFISSID "Androidpablo1" // Put your WifiSSID here
+#define PASSWORD "gaviria7" // Put your wifi password here
 #define TOKEN "BBFF-o2Hl9pzXqqc8vfC9smjimW9IUZkEVJ" // Put your Ubidots' TOKEN
 #define MQTT_CLIENT_NAME "INNSMED_P06" // MQTT client Name, please enter your own 8-12 alphanumeric character ASCII string; 
 #define DEVICE_LABEL "IMS_P06" // Assig the device label
@@ -40,6 +40,9 @@ long numCiclos;
 
 int frec;
 float ieRatio;
+
+#define RXD2 4
+#define TXD2 17
 
 /****************************************
    Auxiliar Functions
@@ -84,8 +87,8 @@ void setup() {
   delay(500);
 
   WiFi.begin(WIFISSID, PASSWORD);
-
-  myserial.begin(115200);
+  
+  myserial.begin(9600, SERIAL_8N1, RXD2, TXD2);
 
   Serial.println();
   Serial.print("Wait for WiFi...");
@@ -107,95 +110,111 @@ void loop() {
 
   if (myserial.available()) {
     inChar = myserial.read();
-    Serial.print(inChar);
+//    Serial.print(inChar);
+
+    if (readP || readF || readI || readPip || readPeep || readN)
+      inputString += inChar;
+
+    if (readP && (inChar == 'b')) {
+      pressure = inputString.toFloat();
+      Serial.print("Presion: ");
+      Serial.println(pressure);
+      inputString = "";
+      readP = LOW;
+    }
+    else if (readF && (inChar == 'r')) {
+      frec = inputString.toInt();
+      Serial.print("Frec: ");
+      Serial.println(frec);
+      inputString = "";
+      readF = LOW;
+    }
+    else if (readI && (inChar == 'i')) {
+      ieRatio = inputString.toFloat();
+      Serial.print("I:E: ");
+      Serial.println(ieRatio);
+      inputString = "";
+      readI = LOW;
+    }
+    if (readPip && (inChar == 'e')) {
+      pip = inputString.toFloat();
+      Serial.print("PIP: ");
+      Serial.println(pip);
+      inputString = "";
+      readPip = LOW;
+    }
+    else if (readPeep && (inChar == 'n')) {
+      peep = inputString.toFloat();
+      Serial.print("PEEP: ");
+      Serial.println(peep);
+      inputString = "";
+      readPeep = LOW;
+    }
+    else if (readN && (inChar == ';')) {
+      numCiclos = inputString.toInt();
+      Serial.print("#Ciclos: ");
+      Serial.println(numCiclos);
+      inputString = "";
+      readN = LOW;
+      sendFlag = HIGH;
+    }
+
+
+    if (inChar == 13)
+      sendFlag = HIGH;
+
+    if (inChar == 'p') {
+      readP = HIGH;
+    }
+
+    if (inChar == 'b') {
+      readF = HIGH;
+    }
+
+    if (inChar == 'r') {
+      readI = HIGH;
+    }
+
+    if (inChar == 'i') {
+      readPip = HIGH;
+    }
+
+    if (inChar == 'e') {
+      readPeep = HIGH;
+    }
+
+    if (inChar == 'n') {
+      readN = HIGH;
+    }
   }
 
-  //    if (readP || readF || readI || readPip || readPeep || readN)
-  //      inputString += inChar;
-  //
-  //    if (inChar == ';') {
-  //      if (readP) {
-  //        pressure = inputString.toFloat();
-  //        readP = LOW;
-  //      }
-  //      else if (readF) {
-  //        frec = inputString.toInt();
-  //        readF = LOW;
-  //      }
-  //      else if (readI) {
-  //        ieRatio = inputString.toFloat();
-  //        readI = LOW;
-  //      }
-  //      if (readPip) {
-  //        pip = inputString.toFloat();
-  //        readPip = LOW;
-  //      }
-  //      else if (readPeep) {
-  //        peep = inputString.toFloat();
-  //        readPeep = LOW;
-  //      }
-  //      else if (readN) {
-  //        numCiclos = inputString.toInt();
-  //        readN = LOW;
-  //      }
-  //      inputString = "";
-  //    }
-  //
-  //  if (inChar == 13)
-  //    sendFlag = HIGH;
-  //
-  //  if (inChar == 'p') {
-  //    readP = HIGH;
-  //  }
-  //
-  //  if (inChar == 'b') {
-  //    readF = HIGH;
-  //  }
-  //
-  //  if (inChar == 'r') {
-  //    readI = HIGH;
-  //  }
-  //
-  //  if (inChar == 'i') {
-  //    readPip = HIGH;
-  //  }
-  //
-  //  if (inChar == 'e') {
-  //    readPeep = HIGH;
-  //  }
-  //
-  //  if (inChar == 'n') {
-  //    readN = HIGH;
-  //  }
-  //}
 
   if (!client.connected()) {
     reconnect();
   }
 
-  //  if (sendFlag) {
+  if (sendFlag) {
 
-  sprintf(topic, "%s%s", "/v1.6/devices/", DEVICE_LABEL);
-  sprintf(payload, "%s", ""); // Cleans the payload
+    sprintf(topic, "%s%s", "/v1.6/devices/", DEVICE_LABEL);
+    sprintf(payload, "%s", ""); // Cleans the payload
 
-  sprintf(payload, "{\"%s\": %s", "p", String(pressure)); // Adds the variable label
+    sprintf(payload, "{\"%s\": %s", "p", String(pressure)); // Adds the variable label
 
-  sprintf(payload, "%s, \"%s\": %s", payload, "f", String(frec)); // Adds the variable label
+    sprintf(payload, "%s, \"%s\": %s", payload, "f", String(frec)); // Adds the variable label
 
-  sprintf(payload, "%s , \"%s\": %s", payload, "r", String(ieRatio)); // Adds the variable label
+    sprintf(payload, "%s , \"%s\": %s", payload, "r", String(ieRatio)); // Adds the variable label
 
-  sprintf(payload, "%s, \"%s\": %s", payload, "i", String(pip)); // Adds the variable label
+    sprintf(payload, "%s, \"%s\": %s", payload, "i", String(pip)); // Adds the variable label
 
-  sprintf(payload, "%s, \"%s\": %s", payload, "e", String(peep)); // Adds the variable label
+    sprintf(payload, "%s, \"%s\": %s", payload, "e", String(peep)); // Adds the variable label
 
-  sprintf(payload, "%s , \"%s\": %s", payload, "n", String(numCiclos)); // Adds the variable label
+    sprintf(payload, "%s , \"%s\": %s", payload, "n", String(numCiclos)); // Adds the variable label
 
 
-  sprintf(payload, "%s }", payload); // Closes the dictionary brackets
-  Serial.println(payload);
-  client.publish(topic, payload);
-  sendFlag = LOW;
-  delay(500);
-  //  }
+    sprintf(payload, "%s }", payload); // Closes the dictionary brackets
+    Serial.println(payload);
+    client.publish(topic, payload);
+    sendFlag = LOW;
+  }
   client.loop();
 }
