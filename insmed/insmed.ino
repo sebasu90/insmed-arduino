@@ -147,6 +147,7 @@ long contadorBuzzer = 0;
 long contadorLecturapresion = 0;
 long contadorHorometro = 0;
 long contadorRstAlarmas = 0;
+long contadorUnlock = 0;
 
 bool refreshLCD = LOW;
 bool checkSensor = LOW;
@@ -165,6 +166,8 @@ long dt3;
 #define ledTimer 250
 #define buzzerTimer 250
 #define rstAlarmasTimer 110
+#define maxnumCiclos 60000
+#define unlockTimer 600000
 
 byte index = 0;
 byte FSM;
@@ -183,12 +186,12 @@ long numCiclosOld;
 int presControlOld;
 int bpmOld;
 float ieRatioOld;
+bool psvModeOld;
+float pTriggerOld;
 float peepPressureLCDOld = 98;
 float maxPressureLCDOld = 98;
 
 float minBattVoltage = 22.5;
-
-#define maxnumCiclos 60000
 
 long numCiclos; // Not so frequecnt EEPROM write
 byte updatenumCiclos = 0;
@@ -202,6 +205,7 @@ float peepPressure = 0.0; // LCD
 float maxPressureLCD;
 float peepPressureLCD;
 float setPeepPressure;
+float pTrigger;
 
 //float compliance;
 //float Volumen;
@@ -408,10 +412,10 @@ class BTSerial
 
     void print(String in)
     {
-//      if (handShaked)
-//      {
-        Serial1.print(in);
-//      }
+      //      if (handShaked)
+      //      {
+      Serial1.print(in);
+      //      }
     }
 
     bool presControlAvailable()
@@ -501,14 +505,14 @@ void setup() //Las instrucciones solo se ejecutan una vez, despues del arranque
 
   // Read from EEPROM the machine's parameters
 
-  EEPROM.get(10, encoderValue[0]);
-  EEPROM.get(20, encoderValue[1]);
-  EEPROM.get(30, encoderValue[2]);
-  EEPROM.get(40, encoderValue[3]);
+  EEPROM.get(10, encoderValue[0]); // P Control
+  EEPROM.get(20, encoderValue[1]); // FR
+  EEPROM.get(30, encoderValue[2]); // I:E
+  EEPROM.get(40, encoderValue[3]); // P trigger PSV Mode
   EEPROM.get(50, encoderValue[4]);
   EEPROM.get(60, encoderValue[5]);
   EEPROM.get(70, encoderValue[6]);
-  EEPROM.get(80, numCiclos);
+  EEPROM.get(80, numCiclos); // num ciclos
 
   offsetPresion = ads.readADC_SingleEnded(1);
 
@@ -784,6 +788,15 @@ void loop()
     }
   }
 
+  if (lockState)
+    contadorUnlock = millis();
+
+  if ((millis() - contadorUnlock) > unlockTimer) {
+    contCursor = 0;
+    lcd.noBlink();
+    lockState = HIGH;
+  }
+
   if (((millis() - contadorRstAlarmas) > changeScreenTimer))
   {
     if (setAlarmas) {
@@ -824,6 +837,10 @@ void loop()
 
   presControl = readPresControlValue();
 
+  pTrigger = readEncoderValue(5);
+
+  psvMode = readEncoderValue(5) % 2;
+
   ieRatio = readIeRatioValue();
   bpm = readBpmValue();
   inhaleTime = 60.0 / (bpm * (1 + ieRatio));
@@ -848,16 +865,14 @@ void loop()
     switch (FSM)
     {
       case 0:
-        if ((psvMode && (peepPressure - pressureRead > 5.0)) || (!psvMode)) {
-          nBase = nSubida;
-          digitalWrite(dirPin, HIGH);
-          dirState = HIGH;
-          contadorCiclo = millis();
-          FSM = 1;
-          motorRun = HIGH;
-          maxPressure2 = 0.0;
-          hysterisis = LOW;
-        }
+        nBase = nSubida;
+        digitalWrite(dirPin, HIGH);
+        dirState = HIGH;
+        contadorCiclo = millis();
+        FSM = 1;
+        motorRun = HIGH;
+        maxPressure2 = 0.0;
+        hysterisis = LOW;
         break;
 
       case 1: // Inhalation Cycle
@@ -941,7 +956,7 @@ void loop()
           checkSensor = HIGH;
         }
 
-        if ((millis() - contadorCiclo) >= int(exhaleTime * 1000 - 150))
+        if ((((millis() - contadorCiclo) >= int(exhaleTime * 1000 - 150)) && (!psvMode)) || ((psvMode && (peepPressure - pressureRead > pTrigger))))
         {
           motorRun = LOW;
           FSM = 0;
@@ -1074,9 +1089,13 @@ void cargarLCD()
   lcd.setCursor(0, 1);
   lcd.print(F("PEEP"));
   lcd.setCursor(0, 2);
-  lcd.print(F("tIN"));
-  lcd.setCursor(0, 3);
-  lcd.print(F("tEX"));
+  lcd.print(F("MODO"));
+
+  if (psvMode) {
+    lcd.setCursor(0, 3);
+    lcd.print(F("SENS-"));
+  }
+
   lcd.setCursor(11, 2);
   lcd.print(F("I:E 1:"));
   lcd.setCursor(11, 1);
@@ -1128,20 +1147,30 @@ void refreshLCDvalues()
       break;
 
     case 4:
-      if (ieRatioOld == ieRatio && bpmOld == bpm)
-        lcdIndex = 9;
+      if (psvModeOld == psvMode)
+        lcdIndex = 6;
       else
       {
+        psvModeOld = psvMode;
+
         lcd.setCursor(5, 2);
-        lcd.print(inhaleTime, 1);
+        if (psvMode)
+          lcd.print("ACV");
+        else
+          lcd.print("PCV");
         lcdIndex++;
       }
       break;
 
     case 5:
-      lcd.setCursor(5, 3);
-      lcd.print(exhaleTime, 1);
-      lcdIndex++;
+      if (pTriggerOld == pTrigger)
+        lcdIndex++;
+      else {
+        pTriggerOld = pTrigger;
+        lcd.setCursor(5, 3);
+        lcd.print(pTrigger, 1);
+        lcdIndex++;
+      }
       break;
 
     case 6:
@@ -1247,6 +1276,16 @@ void refreshLCDvalues()
       {
         lcd.setCursor(17, 2);
       }
+
+      if (contCursor == 4)
+      {
+        lcd.setCursor(4, 2);
+      }
+
+      if (contCursor == 5)
+      {
+        lcd.setCursor(4, 3);
+      }
       lcdIndex++;
       break;
 
@@ -1283,11 +1322,19 @@ void switchCursor () {
   else if (contCursor == 3)
   {
     EEPROM.put(contCursor * 10, encoderValue[contCursor - 1]);
-    //    lcd.noBlink();
+    if (psvMode)
+      contCursor = 4;
+    else
+      contCursor = 1;
+  }
+
+  else if (contCursor == 4)
+  {
+    EEPROM.put(contCursor * 10, encoderValue[contCursor - 1]);
     contCursor = 1;
   }
 
-  else if (contCursor > 3)
+  else if (contCursor > 4)
   {
     contCursor = 1;
     //    lcd.noBlink();
@@ -1322,7 +1369,7 @@ void updatePressure() {
   if (pressureRead > maxPressure)
     maxPressure = pressureRead;
 
-  if ((pressureRead < peepPressure) && pressureRead > -70.0 && ((millis() - contadorCiclo) < 1000) && FSM == 2) {
+  if ((pressureRead < peepPressure) && pressureRead > -70.0 && ((millis() - contadorCiclo) < 600) && FSM == 2) {
     peepPressure = pressureRead;
     peepIndex = 0;
   }
