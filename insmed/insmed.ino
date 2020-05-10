@@ -116,6 +116,7 @@ volatile int encoderValue[10];
 long lastencoderValue = 0;
 
 int16_t adc0; // ADS1015 reading
+int16_t adc2; // ADS1015 reading
 
 // Manage the LDC cursor and screens
 
@@ -222,7 +223,8 @@ int presControl;
 float setPressure = 0.0;
 float pressure = 0.0;
 float pressureRead = 0;
-long offsetPresion = 0;
+int16_t offsetPresion = 0;
+int16_t offsetFlujo = 0;
 
 int readEncoderValue(byte index)
 {
@@ -515,6 +517,7 @@ void setup() //Las instrucciones solo se ejecutan una vez, despues del arranque
   EEPROM.get(80, numCiclos); // num ciclos
 
   offsetPresion = ads.readADC_SingleEnded(1);
+  offsetFlujo = ads.readADC_SingleEnded(1);
 
   cargarLCD();
   contCursor2 = 2;
@@ -579,7 +582,7 @@ void loop()
     outputString += ';';
 
     btSerial.print(outputString);
-    Serial.println(outputString);
+    //    Serial.println(outputString);
 
     //    SPI.transfer('a');
 
@@ -594,11 +597,12 @@ void loop()
 
     //    Serial.print(motorPulses);
     //    Serial.print("\t");
-    //    Serial.print(digitalRead(dirPin));
+    //    Serial.print(ads.readADC_SingleEnded(0));
     //    Serial.print("\t");
-    //    Serial.print(setPressure);
-    //    Serial.print("\t");
-    //    Serial.println(FSM);
+    Serial.print(readFlow());
+    Serial.print("\t");
+    Serial.println(pressureRead);
+
 
     contadorLectura = millis();
 
@@ -746,8 +750,7 @@ void loop()
     refreshLCD = HIGH;
   }
 
-  if ((!setAlarmas || newAlarm) && refreshLCD)
-  {
+  if ((!setAlarmas || newAlarm) && refreshLCD) {
     if (newAlarm)
     {
       displayAlarmas();
@@ -761,8 +764,7 @@ void loop()
     } // If no Alarmas
   }   // If refreshLCD
 
-  if (!isButtonPushDown())
-  { // Anti-Bounce Button Switch
+  if (!isButtonPushDown()) { // Anti-Bounce Button Switch
     contadorBoton = millis();
     contadorBoton2 = millis();
   }
@@ -804,6 +806,7 @@ void loop()
 
       resetAlarmas();
 
+
       presControlOld = 0.1;
       peepPressureLCDOld = 0.1;
       maxPressureLCDOld = 0.1;
@@ -811,7 +814,8 @@ void loop()
       numCiclosOld = 0;
       ieRatioOld = 98;
       lockStateOld = !lockState;
-
+      psvModeOld = !psvMode;
+      pTriggerOld = 98;
       cargarLCD();
     }
     else if (alarmas)
@@ -835,11 +839,13 @@ void loop()
     // End Else no Buzzer
   }   // End If Button Switch
 
+  // Read Control Parameters //
+
   presControl = readPresControlValue();
 
-  pTrigger = readEncoderValue(5);
+  pTrigger = readEncoderValue(5) / 10.0;
 
-  psvMode = readEncoderValue(5) % 2;
+  psvMode = readEncoderValue(4) % 2;
 
   ieRatio = readIeRatioValue();
   bpm = readBpmValue();
@@ -847,6 +853,9 @@ void loop()
   exhaleTime = inhaleTime * ieRatio;
 
   startButtonState = !digitalRead(startButton);
+
+  // Start Cycle
+  updatePressure();
 
   if (startButtonState && !startCycle) {
     startCycle = HIGH;
@@ -1032,17 +1041,29 @@ void updateEncoder()
     if (encoderValue[0] < 20)
       encoderValue[0] = 20;
 
+    if (encoderValue[1] < 20)
+      encoderValue[1] = 20;
+
+    if (encoderValue[1] > 160)
+      encoderValue[1] = 160;
+
     if (encoderValue[2] < 40)
       encoderValue[2] = 40;
 
     if (encoderValue[2] > 200)
       encoderValue[2] = 200;
 
-    if (encoderValue[1] < 20)
-      encoderValue[1] = 20;
+    if (encoderValue[3] < 0)
+      encoderValue[3] = 0;
 
-    if (encoderValue[1] > 160)
-      encoderValue[1] = 160;
+    if (encoderValue[3] > 4)
+      encoderValue[3] = 4;
+
+    if (encoderValue[4] < 80)
+      encoderValue[4] = 80;
+
+    if (encoderValue[4] > 200)
+      encoderValue[4] = 200;
   }
 
   lastEncoded = encoded; //store this value for next time
@@ -1051,16 +1072,12 @@ void updateEncoder()
 float readPressure()
 {
   adc0 = ads.readADC_SingleEnded(0);
-  //    return ((71.38 * (adc0 - offsetPresion) / offsetPresion));
   return ((71.38 * (adc0 - offsetPresion) / offsetPresion) * 1.1128); // No scorrection
-  //  return ((71.38 * (adc0 - offsetPresion) / offsetPresion) * 1.197 + 0.38);
 }
 
 ISR(TIMER1_COMPA_vect) {
   if (motorRun && startCycle) {
     if (((motorPulses < maxPosition) && dirState) || ((motorPulses > minPosition) && !dirState)) {
-      //      dt1 = micros() - t1;
-      //      t1 = micros();
       frecIndex++;
       if (frecIndex >= nBase) { // Frec Base
         frecIndex = 0;
@@ -1093,7 +1110,7 @@ void cargarLCD()
 
   if (psvMode) {
     lcd.setCursor(0, 3);
-    lcd.print(F("SENS-"));
+    lcd.print(F("SENS"));
   }
 
   lcd.setCursor(11, 2);
@@ -1147,19 +1164,38 @@ void refreshLCDvalues()
       break;
 
     case 4:
-      if (psvModeOld == psvMode)
-        lcdIndex = 6;
-      else
-      {
-        psvModeOld = psvMode;
-
-        lcd.setCursor(5, 2);
+      if (psvModeOld == psvMode) {
         if (psvMode)
-          lcd.print("ACV");
+          lcdIndex = 5;
         else
-          lcd.print("PCV");
-        lcdIndex++;
+          lcdIndex = 6;
       }
+      else {
+        psvModeOld = psvMode;
+        lcdIndex++;
+        lcd.setCursor(5, 2);
+        if (psvMode) {
+          lcd.print("ACV");
+          pTriggerOld = 98;
+          lcdIndex = 45;
+        }
+        else {
+          lcd.print("PCV");
+          lcdIndex = 44;
+        }
+      }
+      break;
+
+    case 44:
+      lcd.setCursor(0, 3);
+      lcd.print("        ");
+      lcdIndex = 6;
+      break;
+
+    case 45:
+      lcd.setCursor(0, 3);
+      lcd.print("SENS");
+      lcdIndex = 5;
       break;
 
     case 5:
@@ -1279,12 +1315,12 @@ void refreshLCDvalues()
 
       if (contCursor == 4)
       {
-        lcd.setCursor(4, 2);
+        lcd.setCursor(5, 2);
       }
 
       if (contCursor == 5)
       {
-        lcd.setCursor(4, 3);
+        lcd.setCursor(5, 3);
       }
       lcdIndex++;
       break;
@@ -1322,19 +1358,25 @@ void switchCursor () {
   else if (contCursor == 3)
   {
     EEPROM.put(contCursor * 10, encoderValue[contCursor - 1]);
-    if (psvMode)
-      contCursor = 4;
-    else
-      contCursor = 1;
+    contCursor = 4;
   }
 
   else if (contCursor == 4)
   {
     EEPROM.put(contCursor * 10, encoderValue[contCursor - 1]);
+    if (psvMode)
+      contCursor = 5;
+    else
+      contCursor = 1;
+  }
+
+  else if (contCursor == 5)
+  {
+    EEPROM.put(contCursor * 10, encoderValue[contCursor - 1]);
     contCursor = 1;
   }
 
-  else if (contCursor > 4)
+  else if (contCursor > 5)
   {
     contCursor = 1;
     //    lcd.noBlink();
@@ -1353,6 +1395,12 @@ void resetAlarmas() {
   numAlarmas = 0;
   numCol = 0;
   contCursor = 0;
+}
+
+float readFlow() {
+  adc2 = ads.readADC_SingleEnded(1);
+  //  return (adc2 - offsetFlujo); // No scorrection
+  return (48.64 * (71.38 * (adc2 - offsetFlujo) / offsetFlujo) * 1.1128); // No scorrection
 }
 
 void updatePressure() {
