@@ -209,7 +209,8 @@ float setPeepPressure;
 float pTrigger;
 
 //float compliance;
-//float Volumen;
+float volumen;
+float flujo;
 
 // Process Variables
 
@@ -599,7 +600,7 @@ void loop()
     //    Serial.print("\t");
     //    Serial.print(ads.readADC_SingleEnded(0));
     //    Serial.print("\t");
-    Serial.print(readFlow());
+    Serial.print(flujo);
     Serial.print("\t");
     Serial.println(pressureRead);
 
@@ -856,6 +857,9 @@ void loop()
 
   // Start Cycle
   updatePressure();
+  flujo = readFlow();
+  dtFlujo = millis() - tFlujo;
+  volumen += 
 
   if (startButtonState && !startCycle) {
     startCycle = HIGH;
@@ -1399,7 +1403,6 @@ void resetAlarmas() {
 
 float readFlow() {
   adc2 = ads.readADC_SingleEnded(1);
-  //  return (adc2 - offsetFlujo); // No scorrection
   return (48.64 * (71.38 * (adc2 - offsetFlujo) / offsetFlujo) * 1.1128); // No scorrection
 }
 
