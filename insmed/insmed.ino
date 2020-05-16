@@ -600,9 +600,9 @@ void loop()
     //    Serial.print("\t");
     //    Serial.print(ads.readADC_SingleEnded(0));
     //    Serial.print("\t");
-    Serial.print(flujo);
-    Serial.print("\t");
-    Serial.println(pressureRead);
+    Serial.println(flujo);
+    //    Serial.print("\t");
+    //    Serial.println(pressureRead);
 
 
     contadorLectura = millis();
@@ -859,7 +859,7 @@ void loop()
   updatePressure();
   flujo = readFlow();
   dtFlujo = millis() - tFlujo;
-  volumen += 
+  volumen +=
 
   if (startButtonState && !startCycle) {
     startCycle = HIGH;
