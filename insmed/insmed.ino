@@ -408,10 +408,10 @@ class BTSerial
 
     void print(String in)
     {
-//      if (handShaked)
-//      {
-        Serial1.print(in);
-//      }
+      //      if (handShaked)
+      //      {
+      Serial1.print(in);
+      //      }
     }
 
     bool presControlAvailable()
@@ -575,7 +575,7 @@ void loop()
     outputString += ';';
 
     btSerial.print(outputString);
-//    Serial.println(outputString);
+    //    Serial.println(outputString);
 
     //    SPI.transfer('a');
 
@@ -594,7 +594,8 @@ void loop()
     //    Serial.print("\t");
     //    Serial.print(setPressure);
     //    Serial.print("\t");
-    //    Serial.println(FSM);
+    Serial.println(maxPressure);
+    maxPressure = 0.0;
 
     contadorLectura = millis();
 
@@ -1499,7 +1500,7 @@ void pinSetup () {
 }
 
 float checkBattery () {
-  return (ads.readADC_SingleEnded(2) / 906.14);
+  return (ads.readADC_SingleEnded(3) / 906.14);
 }
 
 /*******************************************************/
